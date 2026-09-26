@@ -16,6 +16,8 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { serve } from '../host/web/serve.mjs';
 import { runOnce } from '../host/node-run.mjs';
+import { instantiateBase } from '../runtime/vera.mjs';
+import { built } from './helpers.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,6 +72,25 @@ try {
   results.cappedBaseline = { ok: cap.ok, error: cap.error ?? null, status: cap.status ?? null };
   if (cap.ok) { failed++; console.log('FAIL capped baseline unexpectedly succeeded'); }
   else console.log('ok   ordinary build capped at 16 MiB fails on the same job (as expected)');
+
+  // Checkpoint, lose some work, reload the page (the worker dies with it),
+  // resume from OPFS and finish: the digest must equal an uninterrupted run.
+  {
+    const req = { mode: 'durable', name: 'vera-durable-test.bin', mb: 8, seed: 42, ops: 20000, ck: 5, total: 40 };
+    const b = await instantiateBase(built('test/fixtures/steps.c').base);
+    b.exports.init(req.mb, req.seed);
+    for (let i = 0; i < req.total; i++) b.exports.step(req.ops);
+    const expected = BigInt.asUintN(64, b.exports.digest()).toString(16);
+    await page.evaluate((r) => window.veraRun(r), { ...req, reset: true });
+    const first = await page.evaluate((r) => window.veraRun(r), { ...req, stopAt: 23 });
+    await page.reload();
+    await page.waitForFunction(() => typeof window.veraRun === 'function');
+    const second = await page.evaluate((r) => window.veraRun(r), { ...req, stopAt: req.total });
+    results.durable = { first, second, expected };
+    const ok = first.ok && !first.finished && first.lastCheckpoint === 20 && second.ok && second.resumedFrom === 20 && second.digest === expected;
+    if (!ok) { failed++; console.log(`FAIL durable resume: ${JSON.stringify(results.durable)}`); }
+    else console.log('ok   checkpoint at step 20, page reloaded mid-work, resumed from OPFS at step 20, final digest matches Node');
+  }
 
   const probe = await page.evaluate(() => window.veraRun({ mode: 'probe' }));
   results.probe = probe;

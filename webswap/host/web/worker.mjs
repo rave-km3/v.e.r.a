@@ -3,6 +3,7 @@
 // and page faults must be served synchronously, so everything happens here.
 import { createVera, instantiateBase, probeMaxMemoryBytes } from '../../runtime/vera.mjs';
 import { OPFSSyncBackend, MemoryBackend, PAGE } from '../../runtime/backends.mjs';
+import { OPFSStore } from '../../runtime/durable.mjs';
 
 const BUILD = new URL('../../build/', import.meta.url);
 const hex = (v) => (v === null || v === undefined ? null : BigInt.asUintN(64, BigInt(v)).toString(16));
@@ -76,10 +77,52 @@ async function probe() {
   };
 }
 
+// Checkpoint/resume demo with test/fixtures/steps.c: run until `stopAt`
+// steps, checkpointing every `ck`; do one extra step that is NOT
+// checkpointed (it is lost if the page dies), and return. After the page is
+// reloaded or killed, the next call resumes from the last checkpoint.
+async function openStoreWithRetry(name) {
+  for (let i = 0; ; i++) {
+    try { return await OPFSStore.open(name); } catch (e) {
+      // The previous (killed) worker may still hold the exclusive lock briefly.
+      if (i >= 50) throw e;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+}
+async function durable({ name, mb, seed, ops, ck, total, stopAt, reset }) {
+  if (reset) {
+    const dir = await navigator.storage.getDirectory();
+    await dir.removeEntry(name).catch(() => {});
+    return { ok: true, mode: 'durable-reset' };
+  }
+  const store = await openStoreWithRetry(name);
+  const v = await createVera({ wasm: await wasmBytes('steps', 'vera'), poolBytes: 1 << 20, durableStore: store, resume: true });
+  let steps = 0;
+  if (v.resumed) steps = v.resumed.extra.steps;
+  else { if (v.exports.init(mb, seed) !== 0) throw new Error('init failed'); v.checkpoint({ steps: 0 }); }
+  const resumedFrom = v.resumed ? steps : null;
+  let lastCheckpoint = steps;
+  const end = Math.min(stopAt, total);
+  while (steps < end) {
+    v.exports.step(ops);
+    steps++;
+    if (steps % ck === 0) { v.checkpoint({ steps }); lastCheckpoint = steps; }
+  }
+  if (steps < total) {
+    v.exports.step(ops); // work that will be lost: no checkpoint follows
+    return { ok: true, mode: 'durable', resumedFrom, lastCheckpoint, finished: false };
+  }
+  const digest = hex(v.exports.digest());
+  store.close();
+  return { ok: true, mode: 'durable', resumedFrom, lastCheckpoint, finished: true, digest };
+}
+
 self.onmessage = async ({ data: { id, req } }) => {
   let res;
   try {
     if (req.mode === 'probe') res = await probe();
+    else if (req.mode === 'durable') res = await durable(req);
     else if (req.mode === 'baseline') res = await runBase(req);
     else res = await runVera(req);
   } catch (e) {

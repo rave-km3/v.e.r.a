@@ -10,6 +10,7 @@
 import { Pager, VeraBudgetError } from './pager.mjs';
 import { MemoryBackend, PAGE } from './backends.mjs';
 import { meter } from './meter.mjs';
+import { DurableBackend } from './durable.mjs';
 
 export { VeraBudgetError };
 
@@ -50,10 +51,16 @@ export function timerResolutionUs() {
   return min === Infinity ? Infinity : min * 1000;
 }
 
+// Options beyond the basics:
+//   durableStore: a raw store from durable.mjs (MemStore, NodeFileStore,
+//                 OPFSStore). Pages then go through a DurableBackend, and
+//                 vera.checkpoint(extra) commits a crash-consistent snapshot.
+//   resume:       with durableStore, continue from the newest valid
+//                 checkpoint if there is one (vera.resumed tells which).
 export async function createVera({
   wasm, poolBytes = 64 << 20, backend = new MemoryBackend(), imports = {},
   readahead = 16, writeBudgetBytesPerDay = 2 ** 30, onBudget = 'warn', onEvent = null,
-  curveMultipliers = [2, 4],
+  curveMultipliers = [2, 4], durableStore = null, resume = false,
 }) {
   const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
   const layout = readLayout(module);
@@ -90,11 +97,31 @@ export async function createVera({
   if (ex.__vera_info(0) >>> 0 !== layout.vbase || ex.__vera_info(2) >>> 0 !== layout.nvp) {
     throw new Error('vera: layout section does not match the module');
   }
+  const ptAddr = ex.__vera_info(1) >>> 0;
+  const ptEnd = ptAddr + layout.nvp * 4;
+  // Low memory saved in checkpoints: everything below the heap base except
+  // the page table (which must be empty on resume anyway).
+  const lowBytes = layout.heapBase - (ptEnd - ptAddr);
+  let resumed = null;
+  if (durableStore) {
+    if (ptEnd > layout.heapBase) throw new Error('vera: unexpected page table placement');
+    backend = new DurableBackend(durableStore, { nvp: layout.nvp, lowBytes });
+    if (resume) {
+      const st = backend.resume();
+      if (st) {
+        const mem = new Uint8Array(memory.buffer);
+        mem.set(st.low.subarray(0, ptAddr), 0);
+        mem.set(st.low.subarray(ptAddr), ptEnd);
+        resumed = { epoch: st.epoch, extra: st.extra };
+      }
+    }
+  }
   pager = new Pager({
-    memory, ptAddr: ex.__vera_info(1) >>> 0, nvp: layout.nvp, framesAddr,
+    memory, ptAddr, nvp: layout.nvp, framesAddr,
     poolFrames: poolBytes / PAGE, backend, readahead, writeBudgetBytesPerDay, onBudget, onEvent,
     curveMultipliers,
   });
+  if (resumed) for (const v of backend.writtenPages()) { pager.written[v] = 1; pager.seen[v] = 1; }
 
   const u8 = () => new Uint8Array(memory.buffer);
   const vbase = layout.vbase;
@@ -156,6 +183,18 @@ export async function createVera({
     faultCurve() { return pager.curve.report(); },
     meter(lang = 'tr', extra = {}) { return meter(vera.stats(), vera.faultCurve(), lang, extra); },
     flush() { pager.flushAll(); },
+    resumed,
+    // Crash-consistent snapshot (needs durableStore). Call it only between
+    // calls into the program, never from inside an import it calls.
+    checkpoint(extra = {}) {
+      if (!durableStore) throw new Error('vera: checkpoint() needs createVera({ durableStore })');
+      pager.flushAll();
+      const mem = u8();
+      const low = new Uint8Array(lowBytes);
+      low.set(mem.subarray(0, ptAddr), 0);
+      low.set(mem.subarray(ptEnd, layout.heapBase), ptAddr);
+      return backend.checkpoint(low, extra);
+    },
     close() { backend.close(); },
   };
   return vera;

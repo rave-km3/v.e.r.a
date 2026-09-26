@@ -98,11 +98,12 @@ sayacında gösteriyor.
 
 ### Doğruluk
 
-- 29 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle **bit bit aynı** sonucu veriyor.
+- 34 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle **bit bit aynı** sonucu veriyor.
   Bu, 3 seed × 5 havuz/depolama ayarı ve 6 farklı uygulama ile kontrol ediliyor. Havuz 64 KiB'a (16 sayfa)
   kadar küçültülüyor.
 - Tarayıcı testi (`node test/browser.mjs`): Chromium'da, bir Worker içinde OPFS'e sayfalayarak 3 uygulama
   çalışıyor; sonuçlar Node'daki normal sürümle aynı. Belleği sınırlanmış normal sürüm aynı işte çöküyor.
+  Sayfa, kontrol noktasından sonra yeniden yüklendiğinde OPFS'ten kaldığı yerden devam ediyor.
 - Çalışma ortamı testi (`node test/cross-runtime.mjs`): Node (V8) ve Bun (JavaScriptCore) aynı sonucu veriyor.
 
 ---
@@ -115,7 +116,7 @@ ve wasm-ld (LLVM 16+). Demo programlar `build/` klasöründe hazır derlenmiş o
 ```sh
 cd webswap
 npm install                      # binaryen (dönüştürücü için)
-npm test                         # derle + 29 test
+npm test                         # derle + 34 test
 
 # Komut satırından
 node host/node-run.mjs --app sort --mb 256 --pool 32M --backend file
@@ -171,6 +172,38 @@ ve `vera.readCString(adres)` kullanılır. Bellek ayırmak için `vera.exports.v
 
 ---
 
+## Kaldığı yerden devam: dayanıklı kontrol noktaları
+
+Telefonlar bellek azalınca arka plandaki sekmeleri ve uygulamaları sık sık öldürür. WebSwap'ın bellek sayfaları
+zaten diskte durduğu için, programın bütün durumunu tutarlı bir anda "mühürleyip" sonra oradan devam etmek mümkün:
+
+```js
+import { OPFSStore } from './runtime/durable.mjs';          // Node'da: NodeFileStore
+const vera = await createVera({ wasm, poolBytes: 32 << 20,
+  durableStore: await OPFSStore.open('benim-heap.bin'), resume: true });
+if (vera.resumed) console.log('kaldığı yerden:', vera.resumed.extra);   // ör. { adim: 120 }
+else vera.exports.init();
+// ... çalış ...
+vera.checkpoint({ adim: 120 });   // programın içindeyken değil, çağrılar arasında
+```
+
+- **Çift yuvalı gölge sayfalama:** Kontrol noktasından sonra bir sayfa hiçbir zaman kaydedilmiş sürümün üzerine
+  yazılmaz; yeni sürüm sayfanın ikinci yuvasına gider. Sayfa haritası, programın düşük belleği (değişkenler,
+  bellek ayırıcının durumu) ve CRC korumalı başlık da iki kopya tutulur. Kontrol noktası yazılırken işlem
+  öldürülse bile, bir önceki tutarlı duruma dönülür.
+- **Test edildi:** Alt süreç rastgele anlarda 20 kez `SIGKILL` ile öldürüldü ve her seferinde kaldığı yerden
+  devam etti. Son sonuç kesintisiz çalışmayla bit bit aynı. Başlık, sayfa haritası ya da kaydedilen bellek
+  bozulduğunda önceki kontrol noktasına dönüldüğü ayrıca test ediliyor. Chromium'da sayfa yeniden yüklenince
+  OPFS'ten devam ediliyor.
+- **Sınırlar:** Kontrol noktası yalnızca programa yapılan çağrıların arasında alınabilir. Son kontrol noktasından
+  sonraki iş kaybolur. Diskte kapladığı yer, kullanılan belleğin yaklaşık iki katıdır. Yazma sırasındaki
+  kesintiye karşı korur, sonradan bozulan diske karşı korumaz.
+- **Öncüller:** Wasm için anlık görüntü alıp geri yükleme yeni değil: wasm-persist (2018), Weave (2026), vpod
+  (2026), Pyodide/Wasmer anlık görüntüleri. Buradaki katkı, talep üzerine sayfalanan bir yığının OPFS'te çökmeye
+  dayanıklı biçimde saklanması ve tembel olarak geri yüklenmesi.
+
+---
+
 ## Hangi cihazlarda?
 
 | Ortam | Durum |
@@ -220,10 +253,11 @@ runtime/pager.mjs        sayfa hatası işleyicisi (CLOCK, dirty, önden okuma, 
 runtime/backends.mjs     depolama: bellek, dosya, OPFS, gecikme benzetimi
 runtime/vera.mjs         createVera(), instantiateBase(), read/write köprüsü
 runtime/meter.mjs        TR/EN sayaç
+runtime/durable.mjs      dayanıklı kontrol noktaları (çift yuvalı gölge sayfalama, CRC başlıkları)
 apps/                    demo programlar: sort, blur, hash, rand, chase, packed, fuzz
 host/node-run.mjs        komut satırı
 host/web/                tarayıcı sayfası + Worker + küçük sunucu
-test/                    29 test + tarayıcı + çalışma ortamı testleri
+test/                    34 test + tarayıcı + çalışma ortamı testleri
 bench/run-all.mjs        ölçüm matrisi → results/BENCH.md
 ```
 
@@ -243,6 +277,11 @@ measures and reports the cost. As far as we could find (September 2026), no gene
 for WebAssembly linear memory in browsers exists. The mechanism itself is well known: software page tables with
 flash paging (ViMem 2007, t-kernel 2006), wasm software MMUs (WAVEN 2025, nix-wasm 2026), and app-specific
 OPFS paging (Photoshop web). See [docs/FIKIR-ARASTIRMASI.md](docs/FIKIR-ARASTIRMASI.md).
+
+Durable checkpoints (`runtime/durable.mjs`): two-slot shadow paging with CRC-protected A/B headers lets a
+program resume from its last checkpoint after the process or tab is killed. This was tested with 20 random
+SIGKILLs (the final digest matches an uninterrupted run), with torn and corrupted checkpoint writes, and with a
+Chromium page reload that resumes from OPFS.
 
 Tested: Linux with Node 22 and Bun 1.3, and headless Chromium 141 (Worker + OPFS). Not yet tested: Safari, iOS,
 Android, Firefox, Windows, macOS.

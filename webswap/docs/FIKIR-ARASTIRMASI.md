@@ -11,7 +11,7 @@
 | # | Aday | Özgünlük sonucu | En yakın öncüller | Karar |
 |---|---|---|---|---|
 | C1 | **WebSwap**: WebAssembly programları için tarayıcının diskine (OPFS) sayfalanan sanal bellek | Kısmen özgün | nix-wasm (2026, yazılım MMU'su var, swap yok), WAVEN (NDSS 2025, SGX içinde, depolama yok), ViMem (2007, sensör düğümlerinde flaşa sayfalama), TrackFM (ASPLOS 2024), Photoshop web (uygulamaya özel OPFS sayfalama) | **Seçildi** |
-| C3 | Resume + Teleport: tarayıcıda kapatılan uygulamanın kaldığı yerden devam etmesi | Kısmen özgün (yalnızca "Resume" kısmı) | Weave (2026, tarayıcılar arası wasm göçü), wasm-persist (2018), vpod (2026), MVVM (2024) | İkinci sıra; ileride WebSwap'a eklenebilir |
+| C3 | Resume + Teleport: tarayıcıda kapatılan uygulamanın kaldığı yerden devam etmesi | Kısmen özgün (yalnızca "Resume" kısmı) | Weave (2026, tarayıcılar arası wasm göçü), wasm-persist (2018), vpod (2026), MVVM (2024) | İkinci sıra. "Resume" kısmı WebSwap'a eklendi (dayanıklı kontrol noktaları). "Teleport" özgün olmadığı için eklenmedi |
 | C5 | Truth Test: kurulumsuz "gerçek bellek" etiketi | Zayıf özgünlük | iOSMemoryBudgetTest (2012), Crash Reporting API, JavaScript'ten swap zamanlaması (2023) | Sayaç fikri WebSwap'a alındı |
 | C6 | Native uygulamalar için ölümsüz bellek SDK'sı | Kısmen özgün (yalnızca bütünleştirme) | SSDAlloc (NSDI 2011) ve patenti, LLNL UMap, RVM (1993), MMKV/LMDB, düz `mmap` | Elendi: işletim sistemi zaten yapıyor |
 | C4 | Recall: yapay zekâ KV önbelleğini diskte tutma | Büyük ölçüde var | llama.cpp PR #28092, oMLX, Google ML Kit prefix caching, Rullama, bitgpu | Elendi |

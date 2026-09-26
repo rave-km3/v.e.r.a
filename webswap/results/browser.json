@@ -8,7 +8,7 @@
    "seed": 1,
    "pool": 1,
    "ok": true,
-   "ms": 2154,
+   "ms": 2616,
    "value": "8b3375eb102da82d",
    "expected": "8b3375eb102da82d",
    "backend": "opfs",
@@ -24,7 +24,7 @@
    "seed": 1,
    "pool": 16,
    "ok": true,
-   "ms": 2751,
+   "ms": 2694,
    "value": "8b05e9aa160f998b",
    "expected": "8b05e9aa160f998b",
    "backend": "opfs",
@@ -40,7 +40,7 @@
    "seed": 1,
    "pool": 8,
    "ok": true,
-   "ms": 12566,
+   "ms": 12523,
    "value": "abdad35434228d2",
    "expected": "abdad35434228d2",
    "backend": "opfs",
@@ -56,16 +56,34 @@
   "error": null,
   "status": 1
  },
+ "durable": {
+  "first": {
+   "ok": true,
+   "mode": "durable",
+   "resumedFrom": null,
+   "lastCheckpoint": 20,
+   "finished": false
+  },
+  "second": {
+   "ok": true,
+   "mode": "durable",
+   "resumedFrom": 20,
+   "lastCheckpoint": 40,
+   "finished": true,
+   "digest": "f4c1e68de506ba0e"
+  },
+  "expected": "f4c1e68de506ba0e"
+ },
  "probe": {
   "ok": true,
   "mode": "probe",
-  "opfs4kWriteUs": {
-   "p50": 0,
-   "p99": 100
+  "opfs4kWrite": {
+   "meanUs": 11.2,
+   "worstBatchMeanUs": 28
   },
-  "opfs4kReadUs": {
-   "p50": 0,
-   "p99": 100
+  "opfs4kRead": {
+   "meanUs": 1.8,
+   "worstBatchMeanUs": 4
   },
   "maxMemoryMiB": 4095.9375,
   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
