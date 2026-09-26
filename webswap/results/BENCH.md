@@ -6,46 +6,46 @@ Environment: Intel(R) Xeon(R) Processor @ 2.10GHz, 4 vCPU, 15.7 GiB RAM, Linux 6
 
 | Workload | Configuration | Heap MiB | Real Memory MiB | Time ms | vs RAM | Projected on slower storage | Storage reads | Read MiB | Written MiB | Result |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| sort | RAM | 128 | 129 | 668 | 1x | — | — | — | — | ok |
+| sort | RAM | 128 | 129 | 733 | 1x | — | — | — | — | ok |
 | sort | RAM-cap 64 MiB | 128 | — | — | — | — | — | — | — | failed: out of memory |
-| sort | V100 mem | 128 | 165 | 1218 | 1.8x | 1218 ms (2x) | 0 | 0 | 0 | ok, same checksum |
-| sort | V25 mem | 128 | 37 | 1374 | 2.1x | 13111 ms (20x) | 68862 | 754 | 324 | ok, same checksum |
-| sort | V25 file | 128 | 37 | 1445 | 2.2x | — | 68862 | 754 | 324 | ok, same checksum |
-| sort | V6 mem | 128 | 13 | 1217 | 1.8x | 12936 ms (19x) | 68489 | 771 | 324 | ok, same checksum |
-| sort | V6 file | 128 | 13 | 1223 | 1.8x | — | 68489 | 771 | 324 | ok, same checksum |
-| sort | V25 delay SIMULATED | 128 | 37 | 13601 | 20.4x | — | 68862 | 754 | 324 | ok, same checksum |
-| blur | RAM | 128 | 129 | 528 | 1x | — | — | — | — | ok |
+| sort | V100 mem | 128 | 165 | 1372 | 1.9x | 1372 ms (2x) | 0 | 0 | 0 | ok, same checksum |
+| sort | V25 mem | 128 | 37 | 1387 | 1.9x | 13125 ms (18x) | 68863 | 754 | 324 | ok, same checksum |
+| sort | V25 file | 128 | 37 | 1651 | 2.3x | — | 68863 | 754 | 324 | ok, same checksum |
+| sort | V6 mem | 128 | 13 | 1115 | 1.5x | 12834 ms (18x) | 68490 | 771 | 324 | ok, same checksum |
+| sort | V6 file | 128 | 13 | 1114 | 1.5x | — | 68490 | 771 | 324 | ok, same checksum |
+| sort | V25 delay SIMULATED | 128 | 37 | 13713 | 18.7x | — | 68863 | 754 | 324 | ok, same checksum |
+| blur | RAM | 128 | 129 | 473 | 1x | — | — | — | — | ok |
 | blur | RAM-cap 64 MiB | 128 | — | — | — | — | — | — | — | failed: out of memory |
-| blur | V100 mem | 128 | 165 | 895 | 1.7x | 895 ms (2x) | 0 | 0 | 0 | ok, same checksum |
-| blur | V25 mem | 128 | 37 | 705 | 1.3x | 4853 ms (9x) | 17409 | 128 | 128 | ok, same checksum |
-| blur | V25 file | 128 | 37 | 728 | 1.4x | — | 17409 | 128 | 128 | ok, same checksum |
-| blur | V6 mem | 128 | 13 | 714 | 1.4x | 4862 ms (9x) | 17409 | 128 | 128 | ok, same checksum |
-| blur | V6 file | 128 | 13 | 709 | 1.3x | — | 17409 | 128 | 128 | ok, same checksum |
-| blur | V25 delay SIMULATED | 128 | 37 | 5140 | 9.7x | — | 17409 | 128 | 128 | ok, same checksum |
-| hash | RAM | 128 | 129 | 325 | 1x | — | — | — | — | ok |
+| blur | V100 mem | 128 | 165 | 872 | 1.8x | 872 ms (2x) | 0 | 0 | 0 | ok, same checksum |
+| blur | V25 mem | 128 | 37 | 772 | 1.6x | 4920 ms (10x) | 17411 | 128 | 128 | ok, same checksum |
+| blur | V25 file | 128 | 37 | 761 | 1.6x | — | 17411 | 128 | 128 | ok, same checksum |
+| blur | V6 mem | 128 | 13 | 772 | 1.6x | 4920 ms (10x) | 17411 | 128 | 128 | ok, same checksum |
+| blur | V6 file | 128 | 13 | 745 | 1.6x | — | 17411 | 128 | 128 | ok, same checksum |
+| blur | V25 delay SIMULATED | 128 | 37 | 5064 | 10.7x | — | 17411 | 128 | 128 | ok, same checksum |
+| hash | RAM | 128 | 129 | 328 | 1x | — | — | — | — | ok |
 | hash | RAM-cap 64 MiB | 128 | — | — | — | — | — | — | — | failed: out of memory |
-| hash | V100 mem | 128 | 165 | 564 | 1.7x | 564 ms (2x) | 0 | 0 | 0 | ok, same checksum |
-| hash | V25 mem | 128 | 37 | 14836 | 45.7x | 529999 ms (1632x) | 3912757 | 15332 | 12481 | ok, same checksum |
-| hash | V25 file | 128 | 37 | 18756 | 57.8x | — | 3912757 | 15332 | 12481 | ok, same checksum |
-| hash | V6 mem | 128 | 13 | 15300 | 47.1x | 648076 ms (1996x) | 4824035 | 19082 | 15296 | ok, same checksum |
-| hash | V6 file | 128 | 13 | 20603 | 63.5x | — | 4824035 | 19082 | 15296 | ok, same checksum |
-| rand | RAM | 128 | 129 | 141 | 1x | — | — | — | — | ok |
+| hash | V100 mem | 128 | 165 | 567 | 1.7x | 567 ms (2x) | 0 | 0 | 0 | ok, same checksum |
+| hash | V25 mem | 128 | 37 | 16528 | 50.4x | 526942 ms (1607x) | 3881098 | 15209 | 12358 | ok, same checksum |
+| hash | V25 file | 128 | 37 | 20197 | 61.6x | — | 3881098 | 15209 | 12358 | ok, same checksum |
+| hash | V6 mem | 128 | 13 | 16974 | 51.8x | 644845 ms (1967x) | 4791335 | 18954 | 15168 | ok, same checksum |
+| hash | V6 file | 128 | 13 | 22446 | 68.5x | — | 4791335 | 18954 | 15168 | ok, same checksum |
+| rand | RAM | 128 | 129 | 151 | 1x | — | — | — | — | ok |
 | rand | RAM-cap 64 MiB | 128 | — | — | — | — | — | — | — | failed: out of memory |
-| rand | V100 mem | 128 | 165 | 196 | 1.4x | 196 ms (1x) | 0 | 0 | 0 | ok, same checksum |
-| rand | V25 mem | 128 | 37 | 848 | 6.0x | 26782 ms (190x) | 153289 | 709 | 714 | ok, same checksum |
-| rand | V25 file | 128 | 37 | 994 | 7.0x | — | 153289 | 709 | 714 | ok, same checksum |
-| rand | V6 mem | 128 | 13 | 875 | 6.2x | 32402 ms (230x) | 189752 | 861 | 861 | ok, same checksum |
-| rand | V6 file | 128 | 13 | 1142 | 8.1x | — | 189752 | 861 | 861 | ok, same checksum |
-| chase | RAM | 128 | 129 | 848 | 1x | — | — | — | — | ok |
+| rand | V100 mem | 128 | 165 | 200 | 1.3x | 200 ms (1x) | 0 | 0 | 0 | ok, same checksum |
+| rand | V25 mem | 128 | 37 | 895 | 5.9x | 26829 ms (178x) | 153290 | 709 | 714 | ok, same checksum |
+| rand | V25 file | 128 | 37 | 1031 | 6.8x | — | 153290 | 709 | 714 | ok, same checksum |
+| rand | V6 mem | 128 | 13 | 835 | 5.5x | 32361 ms (214x) | 189753 | 861 | 861 | ok, same checksum |
+| rand | V6 file | 128 | 13 | 1095 | 7.2x | — | 189753 | 861 | 861 | ok, same checksum |
+| chase | RAM | 128 | 129 | 1030 | 1x | — | — | — | — | ok |
 | chase | RAM-cap 64 MiB | 128 | — | — | — | — | — | — | — | failed: out of memory |
-| chase | V100 mem | 128 | 165 | 2535 | 3.0x | 2535 ms (3x) | 0 | 0 | 0 | ok, same checksum |
-| chase | V25 mem | 128 | 37 | 53670 | 63.3x | 2099718 ms (2476x) | 13718349 | 53591 | 53130 | ok, same checksum |
-| chase | V25 file | 128 | 37 | 70261 | 82.9x | — | 13718349 | 53591 | 53130 | ok, same checksum |
-| chase | V6 mem | 128 | 13 | 85235 | 100.5x | 3949468 ms (4657x) | 25864270 | 101067 | 100430 | ok, same checksum |
-| chase | V6 file | 128 | 13 | 111582 | 131.6x | — | 25864270 | 101067 | 100430 | ok, same checksum |
-| sort | HEADLINE RAM | 2048 | 2049 | 19804 | 1x | — | — | — | — | ok |
+| chase | V100 mem | 128 | 165 | 2671 | 2.6x | 2671 ms (3x) | 0 | 0 | 0 | ok, same checksum |
+| chase | V25 mem | 128 | 37 | 58933 | 57.2x | 2104980 ms (2043x) | 13718350 | 53591 | 53130 | ok, same checksum |
+| chase | V25 file | 128 | 37 | 74584 | 72.4x | — | 13718350 | 53591 | 53130 | ok, same checksum |
+| chase | V6 mem | 128 | 13 | 85184 | 82.7x | 3949418 ms (3833x) | 25864271 | 101067 | 100430 | ok, same checksum |
+| chase | V6 file | 128 | 13 | 124615 | 120.9x | — | 25864271 | 101067 | 100430 | ok, same checksum |
+| sort | HEADLINE RAM | 2048 | 2049 | 18062 | 1x | — | — | — | — | ok |
 | sort | HEADLINE RAM-cap 256 MiB | 2048 | — | — | — | — | — | — | — | failed: out of memory |
-| sort | HEADLINE V file 64 MiB | 2048 | 69 | 34753 | 1.8x | — | 1077130 | 12288 | 5124 | ok, same checksum |
+| sort | HEADLINE V file 64 MiB | 2048 | 69 | 35660 | 2.0x | — | 1077131 | 12288 | 5124 | ok, same checksum |
 
 Notes:
 - `mem`: pages kept in JS memory; measures the paging policy and translation cost only.

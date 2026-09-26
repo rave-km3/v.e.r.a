@@ -495,12 +495,15 @@ sonuç verebilir. Benzer projeler var (LLNL UMap, AIFM), bu yüzden dar bir hede
 geçirildi ([webswap/docs/FIKIR-ARASTIRMASI.md](webswap/docs/FIKIR-ARASTIRMASI.md)). Seçilen fikir
 **v.e.r.a WebSwap** oldu ve çalışan ilk sürümü bu depoda: [webswap/](webswap/).
 
-WebSwap, WebAssembly'ye derlenen C programlarına, gerçek belleklerinden çok daha büyük bir bellek verir.
-Sığmayan sayfalar tarayıcının siteye özel diskine (OPFS) taşınır. Tarayıcı bütün cihazlarda ortak çalışma
-ortamı olduğu için, iOS gibi uygulamalara swap vermeyen sistemler de hedefte. Bu raporun sonuçlarıyla uyumlu
-olarak RAM eklemez ve hızlandırmaz: çökecek işin daha yavaş da olsa bitmesini sağlar ve bedelini ölçer. Örneğin
-2 GiB bellek isteyen bir sıralama, 69 MiB gerçek bellekle, RAM'e göre 1,8 kat yavaş tamamlandı. Rastgele erişen
-işlerde yavaşlama onlarca kat ve üstü. Ayrıntılar: [webswap/README.md](webswap/README.md).
+WebSwap, WebAssembly'ye derlenen C programlarına (WebSwap ile yeniden derlenmeleri gerekir), gerçek wasm
+belleklerinden çok daha büyük bir bellek verir. Sığmayan sayfalar tarayıcının siteye özel diskine (OPFS) taşınır.
+Tarayıcı bütün cihazlarda ortak çalışma ortamı olduğu için, iPhone gibi uygulamalara swap vermeyen sistemler de
+hedefte. Bu raporun sonuçlarıyla uyumlu olarak RAM eklemez ve hızlandırmaz: çökecek işin daha yavaş da olsa
+bitmesini sağlar ve bedelini ölçer. Örneğin 2 GiB bellek isteyen bir sıralama, 69 MiB wasm belleğiyle (artı
+~13 MiB JavaScript tarafı tablo), RAM'e göre 2,0 kat yavaş tamamlandı. Bu ölçümde takas dosyası, 15,7 GiB RAM'li
+makinede işletim sisteminin dosya önbelleğinde kaldı; soğuk diskte ya da RAM'i az bir telefonda daha yavaş olur.
+Benzetilmiş yavaş depolamada sıralı işler ~10-20 kat, rastgele erişen işler yüzlerce ile binlerce kat yavaşlıyor.
+Ayrıntılar: [webswap/README.md](webswap/README.md).
 
 ---
 
