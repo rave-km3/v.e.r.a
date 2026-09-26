@@ -1,0 +1,26 @@
+{
+  "vbase": 268435456,
+  "pageSize": 4096,
+  "sources": [
+    "apps/sort.c"
+  ],
+  "instrument": {
+    "loadsFast": 25,
+    "storesFast": 25,
+    "storesWithTemps": 12,
+    "loadsSlow": 0,
+    "storesSlow": 3,
+    "skippedConst": 13,
+    "functions": 5,
+    "runtimeFunctions": 11,
+    "remainingHelperCalls": 0,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980784,
+      "minPages": 77
+    }
+  }
+}

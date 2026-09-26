@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v.e.r.a WebSwap</title>
+<style>
+  :root { --bg: #f7f7f5; --fg: #1d1d1f; --muted: #5f6368; --card: #ffffff; --line: #dcdcd7; --accent: #0b6e4f; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151515; --fg: #ececec; --muted: #a0a0a0; --card: #1f1f1f; --line: #333; --accent: #4cc38a; --bad: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  select, input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }
+  button { margin-top: 12px; margin-right: 8px; padding: 10px 16px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  pre { white-space: pre-wrap; word-break: break-word; margin: 0; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .ok { color: var(--accent); } .bad { color: var(--bad); }
+  .note { font-size: .9rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>v.e.r.a WebSwap</h1>
+  <p class="lead">Bu sayfa, WebAssembly programına gerçek belleğinden çok daha büyük bir bellek verir: sığmayan sayfalar tarayıcının siteye özel diskine (OPFS) taşınır. RAM eklemez ve hızlandırmaz; belleğe sığmayan işin çökmeden, daha yavaş da olsa bitmesini sağlar.</p>
+
+  <div class="card">
+    <div class="grid">
+      <div><label for="app">Program</label>
+        <select id="app">
+          <option value="sort">sort: sıralama (sıralı erişim)</option>
+          <option value="blur">blur: görüntü bulanıklaştırma</option>
+          <option value="hash">hash: hash tablosu</option>
+          <option value="rand">rand: rastgele güncelleme (en kötü)</option>
+          <option value="chase">chase: işaretçi takibi (en kötü)</option>
+          <option value="fuzz">fuzz: doğruluk testi</option>
+        </select></div>
+      <div><label for="mb">Veri (MiB)</label><input id="mb" type="number" value="256" min="1" max="1800"></div>
+      <div><label for="pool">Sayfa havuzu (MiB)</label><input id="pool" type="number" value="32" min="1" max="240"></div>
+      <div><label for="ops">İşlem sayısı (0 = varsayılan)</label><input id="ops" type="number" value="0" min="0"></div>
+    </div>
+    <button id="runVera">WebSwap ile çalıştır</button>
+    <button id="runBase" class="secondary">Normal sürümü dene (sınırlı bellekle)</button>
+    <button id="probe" class="secondary">Cihaz ölçümü</button>
+    <p class="note">"Normal sürüm", aynı programı sayfalama olmadan, belleği sayfa havuzu kadar sınırlanmış olarak çalıştırır: veri sığmazsa başarısız olur.</p>
+  </div>
+
+  <div class="card"><pre id="out">Hazır.</pre></div>
+</main>
+<script type="module">
+  const worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
+  let nextId = 1;
+  const pending = new Map();
+  worker.onmessage = ({ data: { id, res } }) => { pending.get(id)?.(res); pending.delete(id); };
+  // Also used by the automated browser test.
+  window.veraRun = (req) => new Promise((resolve) => { const id = nextId++; pending.set(id, resolve); worker.postMessage({ id, req }); });
+
+  const $ = (id) => document.getElementById(id);
+  const out = $('out');
+  const MB = 2 ** 20;
+  const form = () => ({ app: $('app').value, mb: +$('mb').value, ops: +$('ops').value, seed: 1, pool: +$('pool').value * MB });
+  const busy = (on) => ['runVera', 'runBase', 'probe'].forEach((b) => ($(b).disabled = on));
+
+  $('runVera').onclick = async () => {
+    busy(true); out.textContent = 'Çalışıyor...';
+    const r = await window.veraRun({ ...form(), mode: 'vera', backend: 'opfs' });
+    out.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = r.ok ? 'ok' : 'bad';
+    head.textContent = r.ok ? `Tamamlandı: ${r.ms.toFixed(0)} ms, sağlama ${r.value}` : `Başarısız: ${r.error || 'durum ' + r.status}`;
+    const body = document.createElement('pre');
+    body.textContent = r.meterTr || '';
+    out.append(head, body);
+    busy(false);
+  };
+  $('runBase').onclick = async () => {
+    busy(true); out.textContent = 'Çalışıyor...';
+    const f = form();
+    const r = await window.veraRun({ ...f, mode: 'baseline', cap: Math.max(f.pool, 16 * MB) });
+    out.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = r.ok ? 'ok' : 'bad';
+    head.textContent = r.ok
+      ? `Normal sürüm sığdı ve bitti: ${r.ms.toFixed(0)} ms, sağlama ${r.value}`
+      : `Normal sürüm başarısız oldu (bellek yetmedi): ${r.error || 'malloc NULL döndü'}`;
+    out.append(head);
+    busy(false);
+  };
+  $('probe').onclick = async () => {
+    busy(true); out.textContent = 'Ölçülüyor...';
+    const r = await window.veraRun({ mode: 'probe' });
+    out.textContent = r.ok
+      ? `OPFS 4 KiB yazma: ortalama ${r.opfs4kWrite.meanUs} µs (en yavaş grup ${r.opfs4kWrite.worstBatchMeanUs} µs)\n` +
+        `OPFS 4 KiB okuma: ortalama ${r.opfs4kRead.meanUs} µs (en yavaş grup ${r.opfs4kRead.worstBatchMeanUs} µs)\n` +
+        `Alınabilen en büyük WebAssembly belleği: ${r.maxMemoryMiB} MiB\n${r.userAgent}`
+      : `Ölçüm başarısız: ${r.error}`;
+    busy(false);
+  };
+</script>
+</body>
+</html>

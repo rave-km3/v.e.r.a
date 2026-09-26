@@ -1,0 +1,73 @@
+{
+ "browser": "chromium 141.0.7390.37",
+ "cases": [
+  {
+   "app": "fuzz",
+   "mb": 16,
+   "ops": 200000,
+   "seed": 1,
+   "pool": 1,
+   "ok": true,
+   "ms": 2154,
+   "value": "8b3375eb102da82d",
+   "expected": "8b3375eb102da82d",
+   "backend": "opfs",
+   "readMiB": 1314,
+   "writtenMiB": 452.5,
+   "memoryMiB": 5.8,
+   "error": null
+  },
+  {
+   "app": "sort",
+   "mb": 64,
+   "ops": 0,
+   "seed": 1,
+   "pool": 16,
+   "ok": true,
+   "ms": 2751,
+   "value": "8b05e9aa160f998b",
+   "expected": "8b05e9aa160f998b",
+   "backend": "opfs",
+   "readMiB": 767.8,
+   "writtenMiB": 324,
+   "memoryMiB": 20.8,
+   "error": null
+  },
+  {
+   "app": "hash",
+   "mb": 32,
+   "ops": 200000,
+   "seed": 1,
+   "pool": 8,
+   "ok": true,
+   "ms": 12566,
+   "value": "abdad35434228d2",
+   "expected": "abdad35434228d2",
+   "backend": "opfs",
+   "readMiB": 3632.3,
+   "writtenMiB": 3065.5,
+   "memoryMiB": 12.8,
+   "error": null
+  }
+ ],
+ "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36",
+ "cappedBaseline": {
+  "ok": false,
+  "error": null,
+  "status": 1
+ },
+ "probe": {
+  "ok": true,
+  "mode": "probe",
+  "opfs4kWriteUs": {
+   "p50": 0,
+   "p99": 100
+  },
+  "opfs4kReadUs": {
+   "p50": 0,
+   "p99": 100
+  },
+  "maxMemoryMiB": 4095.9375,
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+ }
+}
