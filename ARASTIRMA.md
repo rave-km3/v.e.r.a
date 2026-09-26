@@ -489,6 +489,19 @@ sonuç verebilir. Benzer projeler var (LLNL UMap, AIFM), bu yüzden dar bir hede
 3. Aynı aracın Windows sürümü: performans sayaçları, sayfa dosyası ve commit bilgisi.
 4. Sonra Seçenek B'nin önerileri otomatik uygulayan kısmı.
 
+### Sonradan eklenen: Seçenek E, v.e.r.a WebSwap (yapıldı)
+
+"Daha önce yapılmamış bir şey ve bütün cihazlarda" isteği üzerine altı aday fikir öncül araştırmasından
+geçirildi ([webswap/docs/FIKIR-ARASTIRMASI.md](webswap/docs/FIKIR-ARASTIRMASI.md)). Seçilen fikir
+**v.e.r.a WebSwap** oldu ve çalışan ilk sürümü bu depoda: [webswap/](webswap/).
+
+WebSwap, WebAssembly'ye derlenen C programlarına, gerçek belleklerinden çok daha büyük bir bellek verir.
+Sığmayan sayfalar tarayıcının siteye özel diskine (OPFS) taşınır. Tarayıcı bütün cihazlarda ortak çalışma
+ortamı olduğu için, iOS gibi uygulamalara swap vermeyen sistemler de hedefte. Bu raporun sonuçlarıyla uyumlu
+olarak RAM eklemez ve hızlandırmaz: çökecek işin daha yavaş da olsa bitmesini sağlar ve bedelini ölçer. Örneğin
+2 GiB bellek isteyen bir sıralama, 69 MiB gerçek bellekle, RAM'e göre 1,8 kat yavaş tamamlandı. Rastgele erişen
+işlerde yavaşlama onlarca kat ve üstü. Ayrıntılar: [webswap/README.md](webswap/README.md).
+
 ---
 
 ## 9. Bugün hemen deneyebileceklerin

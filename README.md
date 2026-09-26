@@ -1,13 +1,16 @@
 # v.e.r.a
 
-Depolamayı yazılımla RAM'e dönüştürmenin ("sanal RAM") mümkün olup olmadığını inceleyen
-araştırma deposu.
+Depolamayı yazılımla RAM gibi kullanmanın sınırlarını araştıran ve bu sınırlar içinde yeni bir şey yapan proje.
 
-- **[ARASTIRMA.md](ARASTIRMA.md)**: Fizibilite raporu (Türkçe). Kısa cevap, fiziksel sınırlar,
-  mevcut ürünler, akademik çalışmalar, ölçümler ve gerçekçi bir yol haritası.
-- **[bench/](bench/)**: RAM ile depolama arasındaki farkı ölçen küçük C programları (RAM
-  gecikmesi ve bant genişliği, O_DIRECT disk erişimi, mmap sayfa hataları, swap testi).
+- **[ARASTIRMA.md](ARASTIRMA.md)**: Fizibilite raporu (Türkçe). Depolama yazılımla RAM'e dönüştürülebilir mi?
+  Kısa cevap, fiziksel sınırlar, mevcut ürünler, akademik çalışmalar ve ölçümler.
+- **[webswap/](webswap/)**: **v.e.r.a WebSwap**. WebAssembly programlarına gerçek belleklerinden çok daha büyük
+  bir bellek veren sayfalama katmanı. Sığmayan sayfalar tarayıcıda siteye özel diske (OPFS), Node/Bun'da bir
+  dosyaya taşınır. Aynı `.wasm` dosyası tarayıcısı olan her cihaz için tasarlandı. Şimdilik Linux'ta Node, Bun
+  ve Chromium ile test edildi. Neden bu fikrin seçildiği: [webswap/docs/FIKIR-ARASTIRMASI.md](webswap/docs/FIKIR-ARASTIRMASI.md).
+- **[bench/](bench/)**: RAM ile depolama arasındaki farkı ölçen C programları.
 
-Kısaca: Depolamayı sanal belleğin *uzantısı* olarak kullanmak mümkün ve zaten her işletim
-sisteminde var. Depolamanın gerçekten RAM'e *dönüşmesi*, yani RAM hızında çalışması yazılımla
-mümkün değil. Ayrıntılar ve v.e.r.a için önerilen yönler raporda.
+Kısaca: Depolamayı sanal belleğin *uzantısı* olarak kullanmak mümkün ve zaten her işletim sisteminde var.
+Depolamanın gerçekten RAM'e *dönüşmesi*, yani RAM hızında çalışması, yazılımla mümkün değil. WebSwap RAM eklemez
+ve hızlandırmaz. Belleğe sığmadığı için çökecek işin daha yavaş da olsa bitmesini sağlar ve bunun bedelini açıkça
+gösterir. Bunu, swap'ın olmadığı tarayıcılar ve telefonlar için hedefliyor.

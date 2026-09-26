@@ -72,7 +72,24 @@ WebAssembly'de işlemci düzeyinde sayfa hatası yok. Bu yüzden WebSwap bunu ya
 Ayrıntılı tablo: [results/BENCH.md](results/BENCH.md). Ortam: bulut sanal makinesi (4 vCPU, virtio disk).
 Dosya depolamasında okumaları işletim sisteminin önbelleği hızlandırmış olabilir; sayılar gösterge niteliğinde.
 
-<!-- BENCH-SUMMARY -->
+| İş (erişim deseni) | İstenen bellek | Gerçek wasm belleği | Normal sürüm, bellek yarıya sınırlı | WebSwap, RAM'e göre | Yavaş depolamada (50/100 µs) | Diske yazılan |
+|---|---:|---:|---|---:|---:|---:|
+| **sort 1 GiB anahtar** (sıralı) | 2 GiB | 69 MiB | çöktü (256 MiB sınırı) | **1,8x** | — | 5 GB |
+| sort (sıralı) | 128 MiB | 37 MiB | çöktü | 2,1x | 20x (ölçüldü) | 324 MiB |
+| blur (2B yerellik) | 128 MiB | 37 MiB | çöktü | 1,3x | 9,7x (ölçüldü) | 128 MiB |
+| rand (rastgele güncelleme) | 128 MiB | 37 MiB | çöktü | 6,0x | ~190x (tahmini) | 714 MiB |
+| hash (rastgele + sıcak bölge) | 128 MiB | 37 MiB | çöktü | 46x | ~1.600x (tahmini) | 12,5 GB |
+| chase (bağımlı rastgele) | 128 MiB | 37 MiB | çöktü | 63x | ~2.500x (tahmini) | 53 GB |
+
+- Bütün WebSwap çalıştırmalarında sonuç, sınırsız belleğe sahip normal sürümle **aynı** (sağlama toplamı).
+- "RAM'e göre" sütunu bellek içi ve dosya depolamayla ölçüldü; dosya okumalarını işletim sisteminin önbelleği
+  hızlandırmış olabilir. "Yavaş depolamada" sütunu okuma başına 50 µs, yazma başına 100 µs gecikme ekler: sort ve
+  blur için ölçüldü, diğerleri için tahmin edildi. Tahmin modeli, ölçülen iki durumda %4-6 isabetli çıktı.
+- Her şey havuza sığdığında bile adres çevirisinin maliyeti: **1,4-3 kat** (rand 1,4x, blur 1,7x, hash 1,7x,
+  sort 1,8x, chase 3,0x).
+- chase ve hash'te maliyetin çoğu, hazırlık aşamasındaki rastgele yazmalardan geliyor. 128 MiB'lık bir dizi için
+  diske 53 GB yazılması, rastgele yazmanın flaş belleği nasıl yıpratabileceğini gösteriyor. Sayaç ve günlük yazma
+  bütçesi bu yüzden var.
 
 **Özet:** Sıralı erişen işlerde (sıralama, görüntü işleme) bedel makul: birkaç kat. Rastgele erişen işlerde
 (hash tablosu, rastgele güncelleme, işaretçi takibi) havuz küçüldükçe bedel onlarca, yavaş depolamada yüzlerce
@@ -172,8 +189,8 @@ tarayıcıları. Bunun doğrulanması, gerçek cihazlarda test gerektiriyor.
 
 ## Sınırlamalar
 
-- **Yavaşlık:** Her bellek erişimine adres çevirisi eklendiği için, her şey havuza sığsa bile ~1,3-2,5 kat
-  yavaşlama olur. Havuza sığmayan rastgele erişimde yavaşlama çok daha büyüktür.
+- **Yavaşlık:** Her bellek erişimine adres çevirisi eklendiği için, her şey havuza sığsa bile ölçümlerde 1,4-3 kat
+  yavaşlama oldu. Havuza sığmayan rastgele erişimde yavaşlama çok daha büyüktür (yukarıdaki tablo).
 - **Desteklenmeyenler:** Toplu bellek komutları (bulk memory), SIMD, iş parçacıkları/atomikler, `memory.grow`,
   memory64. Dönüştürücü bunları görünce ne yapılması gerektiğini söyleyen bir hata verir.
 - **Yalnızca C (şimdilik):** Freestanding C ve `vera.h` içindeki küçük libc. Rust, Zig ve Emscripten
