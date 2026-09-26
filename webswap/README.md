@@ -123,7 +123,7 @@ gigabaytlara ulaşabiliyor. WebSwap bunu gizlemiyor, sayacında gösteriyor.
 
 ### Doğruluk
 
-- 53 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle aynı 64 bit sağlama toplamını
+- 54 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle aynı 64 bit sağlama toplamını
   veriyor. Bunu iki grup test kontrol ediyor: her yükleme/saklama türünü, hizasız ve sayfa sınırını aşan
   erişimleri deneyen `fuzz` programı 3 seed × 5 havuz/depolama ayarıyla (havuz 64 KiB'a, yani 16 sayfaya kadar
   küçültülüyor) ve 6 demo program, verinin %25'i kadar havuz ve dosya depolamayla.
@@ -147,7 +147,7 @@ wasm-ld (LLVM 16+) gerekir.
 ```sh
 cd webswap
 npm install                      # binaryen (dönüştürücü için)
-npm test                         # derle (clang varsa) + 53 test
+npm test                         # derle (clang varsa) + 54 test
 
 # Komut satırından
 node host/node-run.mjs --app sort --mb 256 --pool 32M --backend file
@@ -324,7 +324,7 @@ runtime/durable.mjs      dayanıklı kontrol noktaları (çift yuvalı gölge sa
 apps/                    demo programlar: sort, blur, hash, rand, chase, packed, fuzz
 host/node-run.mjs        komut satırı
 host/web/                tarayıcı sayfası + Worker + küçük sunucu
-test/                    53 test + tarayıcı + çalışma ortamı testleri
+test/                    54 test + tarayıcı + çalışma ortamı testleri
 bench/run-all.mjs        ölçüm matrisi → results/BENCH.md
 ```
 

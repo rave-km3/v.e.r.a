@@ -66,10 +66,14 @@ export function buildApp(sources, outBase, { vbase = 0x10000000, stackSize = 1 <
   };
 
   // Paged build: app + libc + soft-MMU in ONE link, so there is one memory layout.
-  const tmp = `${outBase}.${process.pid}.${Date.now()}`;
-  const temps = [`${tmp}.linked.wasm`, `${tmp}.vera.wasm`, `${tmp}.base.wasm`, `${tmp}.info.json`];
+  // Intermediate files go to a private directory next to the output (so
+  // parallel builds never collide and renames stay on one file system) under
+  // the output's own base name: wasm-ld records the file name as the module
+  // name, and a fixed name keeps the build reproducible.
+  const tmpDir = fs.mkdtempSync(path.join(path.dirname(path.resolve(outBase)), '.vera-tmp-'));
+  const tmp = path.join(tmpDir, path.basename(outBase));
   try {
-    const linked = temps[0];
+    const linked = `${tmp}.linked.wasm`;
     run(1, [...sources, path.join(RUNTIME, 'vera-libc.c'), path.join(RUNTIME, 'softmmu.c')], linked);
     const { binary, report } = instrument(fs.readFileSync(linked), { vbase, ...instrumentOptions });
     fs.writeFileSync(`${tmp}.vera.wasm`, binary);
@@ -89,7 +93,7 @@ export function buildApp(sources, outBase, { vbase = 0x10000000, stackSize = 1 <
     fs.renameSync(`${tmp}.info.json`, `${outBase}.info.json`);
     return info;
   } finally {
-    for (const t of temps) fs.rmSync(t, { force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
