@@ -1,25 +1,30 @@
 {
   "vbase": 268435456,
+  "stackSize": 1048576,
   "pageSize": 4096,
   "sources": [
     "apps/sort.c"
   ],
   "instrument": {
-    "loadsFast": 25,
-    "storesFast": 25,
-    "storesWithTemps": 12,
+    "loadsFast": 32,
+    "storesFast": 35,
+    "storesWithTemps": 15,
     "loadsSlow": 0,
     "storesSlow": 3,
-    "skippedConst": 13,
-    "functions": 5,
+    "skippedConst": 28,
+    "stackChecks": 6,
+    "functions": 7,
     "runtimeFunctions": 11,
     "remainingHelperCalls": 0,
+    "sharedTemps": 15,
+    "outOfLine": [],
+    "stackTop": 1048576,
     "layout": {
       "format": "vera-webswap/1",
       "vbase": 268435456,
       "pageSize": 4096,
       "nvp": 983040,
-      "heapBase": 4980784,
+      "heapBase": 4980800,
       "minPages": 77
     }
   }

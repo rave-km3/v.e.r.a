@@ -8,12 +8,12 @@
    "seed": 1,
    "pool": 1,
    "ok": true,
-   "ms": 2616,
-   "value": "8b3375eb102da82d",
-   "expected": "8b3375eb102da82d",
+   "ms": 2194,
+   "value": "480cb3bb5785fc9e",
+   "expected": "480cb3bb5785fc9e",
    "backend": "opfs",
-   "readMiB": 1314,
-   "writtenMiB": 452.5,
+   "readMiB": 1297.7,
+   "writtenMiB": 448.8,
    "memoryMiB": 5.8,
    "error": null
   },
@@ -24,7 +24,7 @@
    "seed": 1,
    "pool": 16,
    "ok": true,
-   "ms": 2694,
+   "ms": 2687,
    "value": "8b05e9aa160f998b",
    "expected": "8b05e9aa160f998b",
    "backend": "opfs",
@@ -40,17 +40,26 @@
    "seed": 1,
    "pool": 8,
    "ok": true,
-   "ms": 12523,
+   "ms": 12382,
    "value": "abdad35434228d2",
    "expected": "abdad35434228d2",
    "backend": "opfs",
-   "readMiB": 3632.3,
-   "writtenMiB": 3065.5,
+   "readMiB": 3601.4,
+   "writtenMiB": 3034.6,
    "memoryMiB": 12.8,
    "error": null
   }
  ],
  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36",
+ "opfsAfterRuns": {
+  "files": [
+   "vera-budget.json"
+  ],
+  "budget": {
+   "windowStart": 1790447549885,
+   "used": 3992260608
+  }
+ },
  "cappedBaseline": {
   "ok": false,
   "error": null,
@@ -78,14 +87,14 @@
   "ok": true,
   "mode": "probe",
   "opfs4kWrite": {
-   "meanUs": 11.2,
-   "worstBatchMeanUs": 28
+   "meanUs": 8.7,
+   "worstBatchMeanUs": 17
   },
-  "opfs4kRead": {
-   "meanUs": 1.8,
+  "opfs4kReadWarm": {
+   "meanUs": 1.7,
    "worstBatchMeanUs": 4
   },
-  "maxMemoryMiB": 4095.9375,
+  "reservableMemoryMiB": 4095.9375,
   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
  }
 }

@@ -22,6 +22,8 @@
 // on the stack); vera.checkpoint() enforces nothing about that - the caller
 // does.
 
+import { assertSyncAccessHandle } from './backends.mjs';
+
 const PAGE = 4096;
 const MAGIC = 0x4a524556; // 'VERJ'
 const HDR_WORDS = 16;
@@ -93,7 +95,9 @@ export class OPFSStore {
   static async open(name) {
     const dir = await navigator.storage.getDirectory();
     const fh = await dir.getFileHandle(name, { create: true });
-    return new OPFSStore(await fh.createSyncAccessHandle());
+    const h = await fh.createSyncAccessHandle();
+    try { await assertSyncAccessHandle(h); } catch (e) { h.close(); throw e; }
+    return new OPFSStore(h);
   }
   readAt(off, u8) {
     const n = this.h.read(u8, { at: off });
@@ -123,8 +127,10 @@ export class DurableBackend {
     this.committed = new Uint8Array(nvp); // 0 = none, 1 = slot 0, 2 = slot 1
     this.current = new Uint8Array(nvp);
     this.epoch = 0;
-    this.one = new Uint8Array(PAGE);
+    this.onPhase = null; // test hook: (phase, epoch) => void, e.g. to crash mid-checkpoint
   }
+
+  phase(name) { if (this.onPhase) this.onPhase(name, this.epoch + 1); }
 
   pageOff(v, slot) { return (this.PAGES + 2 * v + slot) * PAGE; }
 
@@ -164,16 +170,25 @@ export class DurableBackend {
     const extraBytes = new TextEncoder().encode(JSON.stringify(extra));
     if (extraBytes.length > PAGE - HDR_WORDS * 4) throw new Error('vera: checkpoint extra data too large');
     this.store.writeAt(this.META[s] * PAGE, meta);
+    this.phase('meta');
     this.store.writeAt(this.LOW[s] * PAGE, low);
+    this.phase('low');
     this.store.flush(); // data before header
+    this.phase('flushed');
     const hdr = new Uint8Array(PAGE);
     const w = new Uint32Array(hdr.buffer, 0, HDR_WORDS);
     w[0] = MAGIC; w[1] = 1; w[2] = epoch >>> 0; w[3] = Math.floor(epoch / 2 ** 32);
     w[4] = this.nvp; w[5] = this.lowBytes; w[6] = crc32(meta); w[7] = crc32(low); w[8] = extraBytes.length;
     hdr.set(extraBytes, HDR_WORDS * 4);
     w[15] = crc32(hdr.subarray(0, 60)) ^ crc32(extraBytes);
-    this.store.writeAt(s * PAGE, hdr);
+    // Written in two parts so a test can tear it: the first 32 bytes (magic,
+    // epoch, CRCs of meta and low) and then the rest (extra length, header CRC,
+    // extra data). A header torn between them fails its CRC.
+    this.store.writeAt(s * PAGE, hdr.subarray(0, 32));
+    this.phase('half-header');
+    this.store.writeAt(s * PAGE + 32, hdr.subarray(32));
     this.store.flush();
+    this.phase('committed');
     this.committed.set(meta);
     this.epoch = epoch;
     return { epoch, bytesWritten: meta.length + low.length + PAGE };

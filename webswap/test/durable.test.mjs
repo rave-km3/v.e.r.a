@@ -56,42 +56,99 @@ test('a torn or corrupt newest checkpoint falls back to the previous one', () =>
   }
 });
 
-test('program state survives SIGKILL at random moments (20 kills)', async () => {
-  const { vera: veraWasm, base } = built('test/fixtures/steps.c');
-  const TOTAL = 60, OPS = 20000, CK = 4;
-  // Reference: uninterrupted run of the ordinary build.
+// Reference digest: an uninterrupted run of the ordinary build.
+async function referenceDigest(base, total, ops) {
   const b = await instantiateBase(base);
   b.exports.init(8, 42);
-  for (let i = 0; i < TOTAL; i++) b.exports.step(OPS);
-  const expected = BigInt.asUintN(64, b.exports.digest()).toString(16);
+  for (let i = 0; i < total; i++) b.exports.step(ops);
+  return BigInt.asUintN(64, b.exports.digest()).toString(16);
+}
 
+// Runs the child once. killWhen(line) is called for every stdout line; when
+// it returns a delay in ms, the child is SIGKILLed that long afterwards.
+function runChild(args, { env = {}, killWhen = () => null } = {}) {
+  const child = path.join(ROOT, 'test', 'fixtures', 'durable-child.mjs');
+  const p = spawn(process.execPath, [child, ...args], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+  const lines = [];
+  let buf = '', err = '', timer = null;
+  p.stdout.on('data', (d) => {
+    buf += d;
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i);
+      buf = buf.slice(i + 1);
+      lines.push(line);
+      const delay = timer === null ? killWhen(line) : null;
+      if (delay !== null && delay !== undefined) timer = setTimeout(() => p.kill('SIGKILL'), delay);
+    }
+  });
+  p.stderr.on('data', (d) => { err += d; });
+  return new Promise((resolve) => p.on('exit', (code, sig) => {
+    clearTimeout(timer);
+    const ck = lines.filter((l) => l.startsWith('CK ')).map((l) => +l.slice(3));
+    const res = /^resumed epoch (\d+) at step (\d+)$/.exec(lines.find((l) => l.startsWith('resumed')) ?? '');
+    const done = /^DONE ([0-9a-f]+)$/.exec(lines.find((l) => l.startsWith('DONE')) ?? '');
+    resolve({ exit: sig || code, lines, err, lastCk: ck.length ? ck[ck.length - 1] : null,
+      resumed: res ? { epoch: +res[1], step: +res[2] } : null, digest: done ? done[1] : null });
+  }));
+}
+
+test('program state survives 20 SIGKILLs spread over the run; every checkpoint that returned survives', async () => {
+  const { vera: veraWasm, base } = built('test/fixtures/steps.c');
+  const TOTAL = 75, OPS = 5000, CK = 3, KILLS = 20;
+  const expected = await referenceDigest(base, TOTAL, OPS);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vera-durable-'));
   const wasmPath = path.join(dir, 'steps.vera.wasm');
   fs.writeFileSync(wasmPath, veraWasm);
-  const heap = path.join(dir, 'heap.bin');
-  const child = path.join(ROOT, 'test', 'fixtures', 'durable-child.mjs');
-  let kills = 0, resumes = 0, final = null;
-  for (let attempt = 0; attempt < 200 && final === null; attempt++) {
-    const p = spawn(process.execPath, [child, wasmPath, heap, `${TOTAL}`, `${OPS}`, `${CK}`], { stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    p.stdout.on('data', (d) => { out += d; });
-    let err = '';
-    p.stderr.on('data', (d) => { err += d; });
-    const killAfter = kills < 20 ? 40 + ((attempt * 37) % 160) : null; // ms
-    const timer = killAfter === null ? null : setTimeout(() => p.kill('SIGKILL'), killAfter);
-    const code = await new Promise((r) => p.on('exit', (c, sig) => r(sig || c)));
-    if (timer) clearTimeout(timer);
-    if (/resumed epoch/.test(out)) resumes++;
-    const m = /DONE ([0-9a-f]+)/.exec(out);
-    if (m) final = m[1];
-    else if (code === 'SIGKILL') kills++;
-    else assert.fail(`child exited with ${code}: ${err}`);
+  const args = [wasmPath, path.join(dir, 'heap.bin'), `${TOTAL}`, `${OPS}`, `${CK}`];
+  let lastDurable = 0; // newest checkpoint the child reported as returned
+  const resumedAt = [];
+  for (let k = 0; k < KILLS; k++) {
+    // Kill k waits for a checkpoint at or past step 3(k+1), so kills move
+    // through the whole run, then lands 0-129 ms later (a checkpoint period is
+    // ~120 ms here): inside a step, a page write-back or the next checkpoint.
+    // Crashes at each checkpoint phase are forced in the next test.
+    const target = CK * (k + 1);
+    const r = await runChild(args, { killWhen: (l) => (l.startsWith('CK ') && +l.slice(3) >= target ? (k * 29) % 130 : null) });
+    assert.equal(r.exit, 'SIGKILL', `attempt ${k} was killed (lines: ${r.lines.join(' | ')}; ${r.err})`);
+    if (k > 0) {
+      assert.ok(r.resumed, `attempt ${k} resumed instead of starting over`);
+      assert.ok(r.resumed.step > 0, 'resumed past step 0');
+      assert.ok(r.resumed.step >= lastDurable, `resumed at step ${r.resumed.step}, but checkpoint ${lastDurable} had returned`);
+      resumedAt.push(r.resumed.step);
+    }
+    lastDurable = Math.max(lastDurable, r.lastCk ?? 0);
+  }
+  const fin = await runChild(args);
+  assert.equal(fin.exit, 0, fin.err);
+  assert.ok(fin.resumed && fin.resumed.step >= lastDurable);
+  resumedAt.push(fin.resumed.step);
+  assert.equal(fin.digest, expected, 'digest after 20 kills and resumes equals the uninterrupted run');
+  fs.rmSync(dir, { recursive: true, force: true });
+  console.log(`# ${KILLS} SIGKILLs; resumed at steps ${resumedAt.join(', ')}; final digest matches`);
+});
+
+test('a crash inside each phase of a checkpoint resumes from the right checkpoint', async () => {
+  const { vera: veraWasm, base } = built('test/fixtures/steps.c');
+  const TOTAL = 15, OPS = 5000, CK = 3;
+  const expected = await referenceDigest(base, TOTAL, OPS);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vera-durable-phase-'));
+  const wasmPath = path.join(dir, 'steps.vera.wasm');
+  fs.writeFileSync(wasmPath, veraWasm);
+  // Epoch 1 is step 0, epoch 2 step 3, epoch 3 step 6, epoch 4 step 9.
+  for (const phase of ['meta', 'low', 'flushed', 'half-header', 'committed']) {
+    const heap = path.join(dir, `heap-${phase}.bin`);
+    const args = [wasmPath, heap, `${TOTAL}`, `${OPS}`, `${CK}`];
+    const crashed = await runChild(args, { env: { VERA_CRASH: `4:${phase}` } });
+    assert.equal(crashed.exit, 'SIGKILL', `${phase}: the child killed itself`);
+    assert.equal(crashed.lastCk, 6, `${phase}: died during the checkpoint for step 9`);
+    const fin = await runChild(args);
+    assert.equal(fin.exit, 0, fin.err);
+    const want = phase === 'committed' ? { epoch: 4, step: 9 } : { epoch: 3, step: 6 };
+    assert.deepEqual(fin.resumed, want, `${phase}: resumed from the newest complete checkpoint`);
+    assert.equal(fin.digest, expected, `${phase}: final digest equals the uninterrupted run`);
   }
   fs.rmSync(dir, { recursive: true, force: true });
-  assert.equal(final, expected, 'digest after kills and resumes equals the uninterrupted run');
-  assert.ok(kills >= 5, `the child was really killed (${kills} kills)`);
-  assert.ok(resumes >= 1, 'the child really resumed');
-  console.log(`# ${kills} SIGKILLs, ${resumes} resumes, final digest matches`);
 });
 
 test('checkpoint/resume in-process: heap and allocator state come back', async () => {

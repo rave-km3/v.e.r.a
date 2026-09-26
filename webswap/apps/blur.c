@@ -6,6 +6,7 @@
 
 VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
 {
+    vera_app_status = 0;
     u32 px = (mbytes << 20) / 4, w = 1;
     while ((w + 1) * (w + 1) <= px) w++;
     u32 hgt = w;
@@ -35,5 +36,7 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
     }
     u64 h = 0;
     for (u32 i = 0; i < w * hgt; i++) h = vera_mix(h, img[i]);
+    free(img);
+    free(out);
     return h;
 }

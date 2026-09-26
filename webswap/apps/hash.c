@@ -10,6 +10,7 @@ static u64 hash64(u64 x) { x ^= x >> 33; x *= 0xff51afd7ed558ccdull; x ^= x >> 3
 
 VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
 {
+    vera_app_status = 0;
     u32 cap = 1;
     while ((u64)cap * 2 * sizeof(slot) <= ((u64)mbytes << 20)) cap *= 2;
     slot *tab = malloc((size_t)cap * sizeof(slot));
@@ -31,5 +32,6 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
         while (tab[j].key != k) j = (j + 1) & (cap - 1);
         h = vera_mix(h, tab[j].val);
     }
+    free(tab);
     return h;
 }

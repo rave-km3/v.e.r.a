@@ -32,6 +32,7 @@ typedef unsigned long size_t;
 #endif
 #define VERA_PAGE_SHIFT 12u
 #define VERA_PAGE_SIZE (1u << VERA_PAGE_SHIFT)
+_Static_assert((VERA_VBASE & 0xFFFFu) == 0 && VERA_VBASE != 0, "VERA_VBASE must be a non-zero multiple of 64 KiB");
 /* Virtual pages from VBASE up to the 4 GiB limit of wasm32. */
 #define VERA_NVP ((u32)((0x100000000ull - VERA_VBASE) >> VERA_PAGE_SHIFT))
 
@@ -49,7 +50,9 @@ void *memset(void *dst, int c, size_t n);
 int memcmp(const void *a, const void *b, size_t n);
 size_t strlen(const char *s);
 
-/* Set by the apps: 0 = ok, 1 = allocation failed. */
+/* Set by the apps: 0 = ok, 1 = allocation failed, 2 = app-specific
+ * self-check failed (e.g. sort output not sorted). Apps reset it to 0 at the
+ * start of every entry point. */
 extern u32 vera_app_status;
 
 /* ---- helpers for the demo apps ----------------------------------------- */

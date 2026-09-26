@@ -24,7 +24,8 @@
 
 /* JS pager: map virtual page v (write=1 for a store) and return its entry. */
 extern u32 __vera_fault(u32 v, u32 write) VERA_IMPORT("vera", "fault");
-/* JS: throw a descriptive error (1 = aligned access crossing a page). */
+/* JS: throw a descriptive error (1 = aligned access crossing a page,
+ * 2 = shadow-stack overflow; the check for 2 is inserted by instrument.mjs). */
 extern void __vera_trap(u32 code, u32 addr) VERA_IMPORT("vera", "trap");
 
 u32 __vera_pt[VERA_NVP];

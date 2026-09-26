@@ -8,6 +8,7 @@
 VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
 {
     (void)ops;
+    vera_app_status = 0;
     u32 n = (mbytes << 20) / 4;
     u32 *a = malloc((size_t)n * 4), *t = malloc((size_t)n * 4);
     if (!a || !t) { vera_app_status = 1; return 0; }
@@ -23,8 +24,10 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
     }
     u64 h = 0;
     for (u32 i = 0; i < n; i++) {
-        if (i && a[i - 1] > a[i]) { vera_app_status = 2; return 0; }
+        if (i && a[i - 1] > a[i]) { vera_app_status = 2; free(a); free(t); return 0; }
         h = vera_mix(h, a[i]);
     }
+    free(a);
+    free(t);
     return h;
 }

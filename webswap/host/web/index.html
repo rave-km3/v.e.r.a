@@ -98,8 +98,8 @@
     const r = await window.veraRun({ mode: 'probe' });
     out.textContent = r.ok
       ? `OPFS 4 KiB yazma: ortalama ${r.opfs4kWrite.meanUs} µs (en yavaş grup ${r.opfs4kWrite.worstBatchMeanUs} µs)\n` +
-        `OPFS 4 KiB okuma: ortalama ${r.opfs4kRead.meanUs} µs (en yavaş grup ${r.opfs4kRead.worstBatchMeanUs} µs)\n` +
-        `Alınabilen en büyük WebAssembly belleği: ${r.maxMemoryMiB} MiB\n${r.userAgent}`
+        `OPFS 4 KiB okuma (sıcak önbellek, alt sınır): ortalama ${r.opfs4kReadWarm.meanUs} µs (en yavaş grup ${r.opfs4kReadWarm.worstBatchMeanUs} µs)\n` +
+        `Tarayıcının ayırdığı en büyük WebAssembly belleği: ${r.reservableMemoryMiB} MiB (üst sınır: adres alanı ayrıldı, cihazın bu kadar RAM'i olduğu anlamına gelmez)\n${r.userAgent}`
       : `Ölçüm başarısız: ${r.error}`;
     busy(false);
   };

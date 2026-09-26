@@ -3,20 +3,20 @@
   "stackSize": 1048576,
   "pageSize": 4096,
   "sources": [
-    "apps/blur.c"
+    "test/fixtures/alloc.c"
   ],
   "instrument": {
-    "loadsFast": 29,
-    "storesFast": 25,
-    "storesWithTemps": 7,
+    "loadsFast": 46,
+    "storesFast": 70,
+    "storesWithTemps": 25,
     "loadsSlow": 0,
-    "storesSlow": 0,
-    "skippedConst": 27,
-    "stackChecks": 4,
-    "functions": 7,
+    "storesSlow": 1,
+    "skippedConst": 35,
+    "stackChecks": 8,
+    "functions": 13,
     "runtimeFunctions": 11,
     "remainingHelperCalls": 0,
-    "sharedTemps": 7,
+    "sharedTemps": 25,
     "outOfLine": [],
     "stackTop": 1048576,
     "layout": {

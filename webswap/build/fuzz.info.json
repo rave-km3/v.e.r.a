@@ -1,25 +1,30 @@
 {
   "vbase": 268435456,
+  "stackSize": 1048576,
   "pageSize": 4096,
   "sources": [
     "apps/fuzz.c"
   ],
   "instrument": {
-    "loadsFast": 73,
-    "storesFast": 90,
-    "storesWithTemps": 48,
-    "loadsSlow": 4,
+    "loadsFast": 75,
+    "storesFast": 97,
+    "storesWithTemps": 50,
+    "loadsSlow": 8,
     "storesSlow": 6,
-    "skippedConst": 13,
-    "functions": 10,
+    "skippedConst": 27,
+    "stackChecks": 4,
+    "functions": 11,
     "runtimeFunctions": 11,
     "remainingHelperCalls": 0,
+    "sharedTemps": 50,
+    "outOfLine": [],
+    "stackTop": 1048576,
     "layout": {
       "format": "vera-webswap/1",
       "vbase": 268435456,
       "pageSize": 4096,
       "nvp": 983040,
-      "heapBase": 4980784,
+      "heapBase": 4980800,
       "minPages": 77
     }
   }

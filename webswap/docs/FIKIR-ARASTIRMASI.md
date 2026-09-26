@@ -23,14 +23,17 @@ cihazlar arası RAM ödünç alma (Wi-Fi gecikmesi SSD'den yavaş; Nswap, Infini
 ## Neden WebSwap?
 
 - **Bütün cihazlar:** Her işletim sisteminin ortak çalışma ortamı tarayıcı. Aynı `.wasm` dosyası Windows, macOS,
-  Linux, Android ve iPhone/iPad tarayıcılarında çalışacak şekilde tasarlandı. iPhone'da uygulamalar için swap yok,
-  bu yüzden en büyük fayda orada beklenebilir. **Ama iPhone'da ve Safari'de henüz denenmedi.**
+  Linux, Android ve iPhone/iPad tarayıcılarında çalışacak şekilde tasarlandı. iPhone'da (ve M çipsiz iPad'lerde)
+  uygulamalar için swap yok, bu yüzden en büyük fayda orada beklenebilir. M çipli iPad'lerde iPadOS 16'dan beri
+  sistem düzeyinde swap var. **Ama iPhone'da, iPad'de ve Safari'de henüz denenmedi.**
 - **Fiziğe dürüst:** RAM eklemez, hızlandırmaz. "Bellek yetmedi, sekme çöktü" durumunu "daha yavaş ama bitti"
   durumuna çevirir ve bunun bedelini açıkça ölçer.
-- **Özgünlük, dürüst ifadesiyle:** Aramamızda, herhangi bir C programını yeniden derleyerek tarayıcıda OPFS'e
-  sayfalanan genel, hazır bir sanal bellek katmanı bulamadık. **Mekanizma yeni değil** (yazılımla sayfa tablosu
-  ve flaşa sayfalama 2006-2007'den beri biliniyor). Yeni olan, bunun her tarayıcıda çalışan genel bir paket
-  hâline getirilmesi.
+- **Özgünlük, dürüst ifadesiyle:** Aramamızda, C programlarını yeniden derleyerek tarayıcıda OPFS'e sayfalanan
+  genel, hazır bir sanal bellek katmanı bulamadık. **Mekanizma yeni değil** (yazılımla sayfa tablosu ve flaşa
+  sayfalama 2006-2007'den beri biliniyor). Yeni olan, bunun her tarayıcıda çalışan genel bir paket hâline
+  getirilmesi.
+- **Kapsam, dürüst ifadesiyle:** Bugünkü sürüm hazır `.wasm` dosyalarını değil, kaynak koddan yeniden derlenen
+  freestanding C programlarını (WebSwap'ın küçük libc'siyle) çalıştırır. Emscripten, Rust ve Zig desteği yok.
 
 ## Kullanılmaması gereken ifadeler
 
@@ -39,4 +42,4 @@ cihazlar arası RAM ödünç alma (Wi-Fi gecikmesi SSD'den yavaş; Nswap, Infini
 
 Doğru ifade: *"Eylül 2026'daki aramamızda, WebAssembly doğrusal belleği için tarayıcıda çalışan, genel ve hazır
 bir talep üzerine sayfalama katmanı bulamadık. Mekanizma bilinen bir teknik; katkımız bunu genel bir paket
-hâline getirmek."*
+hâline getirmek. Şimdilik yeniden derlenen C programlarıyla çalışır."*

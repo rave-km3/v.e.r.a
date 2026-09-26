@@ -19,24 +19,36 @@ export class VeraTrapError extends Error {
 }
 
 const WASM_PAGE = 65536;
+const MAX_PAGES = 65535; // 4 GiB - 64 KiB: a full 4 GiB Memory overflows u32 sizes
 const alignUp = (x, a) => Math.ceil(x / a) * a;
 
 export function readLayout(module) {
   const sec = WebAssembly.Module.customSections(module, 'vera.layout');
   if (!sec.length) throw new Error('vera: module has no vera.layout section (build it with tools/vera-build.mjs)');
-  return JSON.parse(new TextDecoder().decode(sec[0]));
+  const layout = JSON.parse(new TextDecoder().decode(sec[0]));
+  if (layout.format !== 'vera-webswap/1' || layout.vbase % WASM_PAGE !== 0 || layout.vbase <= 0
+    || layout.nvp * PAGE !== 2 ** 32 - layout.vbase || layout.heapBase >= layout.vbase) {
+    throw new Error('vera: invalid vera.layout section');
+  }
+  return layout;
 }
 
-// Largest Memory we can actually get, trying from `want` downwards.
+// Largest WebAssembly.Memory this engine lets us *reserve*, searching
+// downwards from `want` with a bisection (64 KiB granularity). This is an
+// upper bound, not usable RAM: engines commit memory lazily, so a phone may
+// still kill the tab well before this size is actually touched.
 export function probeMaxMemoryBytes(want) {
-  for (let bytes = alignUp(want, WASM_PAGE); bytes >= 16 * WASM_PAGE; bytes = alignUp(Math.floor(bytes / 2), WASM_PAGE)) {
-    try {
-      const pages = bytes / WASM_PAGE;
-      new WebAssembly.Memory({ initial: pages, maximum: pages });
-      return bytes;
-    } catch { /* RangeError: try smaller */ }
+  const ok = (pages) => {
+    try { new WebAssembly.Memory({ initial: pages, maximum: pages }); return true; } catch { return false; }
+  };
+  let hi = Math.min(MAX_PAGES, Math.ceil(want / WASM_PAGE));
+  if (ok(hi)) return hi * WASM_PAGE;
+  let lo = 0;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >>> 1;
+    if (ok(mid)) lo = mid; else hi = mid;
   }
-  return 0;
+  return lo * WASM_PAGE;
 }
 
 // Smallest step of performance.now() in microseconds. Browsers often coarsen
@@ -52,6 +64,12 @@ export function timerResolutionUs() {
 }
 
 // Options beyond the basics:
+//   writeBudgetBytes: storage write budget over a 24 h window (default 1 GiB).
+//   budgetStore:  {load(), save(state)} (backends.mjs: FileBudgetStore,
+//                 OPFSBudgetStore) to keep that window across runs, so it
+//                 really is a daily budget; without it the window is per run.
+//   onBudget:     'warn' (onEvent, or console.warn; delivered after the
+//                 fault returns) or 'throw' (the program aborts).
 //   durableStore: a raw store from durable.mjs (MemStore, NodeFileStore,
 //                 OPFSStore). Pages then go through a DurableBackend, and
 //                 vera.checkpoint(extra) commits a crash-consistent snapshot.
@@ -59,16 +77,18 @@ export function timerResolutionUs() {
 //                 checkpoint if there is one (vera.resumed tells which).
 export async function createVera({
   wasm, poolBytes = 64 << 20, backend = new MemoryBackend(), imports = {},
-  readahead = 16, writeBudgetBytesPerDay = 2 ** 30, onBudget = 'warn', onEvent = null,
+  readahead = 16, writeBudgetBytes, writeBudgetBytesPerDay, budgetStore = null,
+  onBudget = 'warn', onEvent = null,
   curveMultipliers = [2, 4], durableStore = null, resume = false,
 }) {
+  const budgetBytes = writeBudgetBytes ?? writeBudgetBytesPerDay ?? 2 ** 30;
   const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
   const layout = readLayout(module);
   const framesAddr = alignUp(Math.max(layout.heapBase, layout.minPages * WASM_PAGE), WASM_PAGE);
   const maxPool = layout.vbase - framesAddr;
 
   if (poolBytes === 'auto') {
-    // Half of the largest Memory this device lets us allocate, capped at 128 MiB.
+    // Half of the largest Memory this device lets us reserve, capped at 128 MiB.
     const got = probeMaxMemoryBytes(Math.min(maxPool, 256 << 20) + framesAddr);
     poolBytes = Math.min(128 << 20, Math.floor((got - framesAddr) / 2));
   }
@@ -83,9 +103,11 @@ export async function createVera({
   const veraImports = {
     fault: (v, write) => pager.fault(v, write),
     trap: (code, addr) => {
-      throw new VeraTrapError(code === 1
-        ? `vera: aligned access at 0x${(addr >>> 0).toString(16)} crosses a page boundary (a misaligned pointer used with an aligned load/store)`
-        : `vera: trap ${code} at 0x${(addr >>> 0).toString(16)}`);
+      const a = `0x${(addr >>> 0).toString(16)}`;
+      throw new VeraTrapError(
+        code === 1 ? `vera: aligned access at ${a} crosses a page boundary (a misaligned pointer used with an aligned load/store)`
+          : code === 2 ? `vera: stack overflow (stack pointer would become ${a}); build with a larger --stack-size or use less recursion`
+            : `vera: trap ${code} at ${a}`);
     },
   };
   const instance = await WebAssembly.instantiate(module, {
@@ -116,10 +138,11 @@ export async function createVera({
       }
     }
   }
+  const budgetState = budgetStore ? await budgetStore.load() : null;
   pager = new Pager({
     memory, ptAddr, nvp: layout.nvp, framesAddr,
-    poolFrames: poolBytes / PAGE, backend, readahead, writeBudgetBytesPerDay, onBudget, onEvent,
-    curveMultipliers,
+    poolFrames: poolBytes / PAGE, backend, readahead, writeBudgetBytes: budgetBytes, onBudget, onEvent,
+    budgetState, saveBudget: budgetStore ? (s) => budgetStore.save(s) : null, curveMultipliers,
   });
   if (resumed) for (const v of backend.writtenPages()) { pager.written[v] = 1; pager.seen[v] = 1; }
 
@@ -135,6 +158,7 @@ export async function createVera({
       const a = vaddr + done;
       if (a < vbase) {
         const n = Math.min(len - done, vbase - a);
+        if (a + n > memory.buffer.byteLength) throw new RangeError(`vera: address 0x${a.toString(16)} is outside the program's memory`);
         cb(a, done, n);
         done += n;
       } else {
@@ -161,10 +185,10 @@ export async function createVera({
     readCString(vaddr, max = 1 << 20) {
       const parts = [];
       for (let i = 0; i < max; i += 256) {
-        const chunk = vera.read(vaddr + i, 256);
+        const chunk = vera.read(vaddr + i, Math.min(256, 2 ** 32 - (vaddr >>> 0) - i));
         const z = chunk.indexOf(0);
         parts.push(z >= 0 ? chunk.subarray(0, z) : chunk);
-        if (z >= 0) break;
+        if (z >= 0 || chunk.length < 256) break;
       }
       const all = new Uint8Array(parts.reduce((s, p) => s + p.length, 0));
       let o = 0;
@@ -177,7 +201,7 @@ export async function createVera({
         backend: backend.kind, poolBytes, poolFrames: pager.P, memoryBytes: memory.buffer.byteLength,
         timerResolutionUs: vera.timerResolutionUs,
         residentPages: pager.residentPages(), ...pager.stats, budgetUsedBytes: pager.budgetUsed,
-        writeBudgetBytesPerDay,
+        writeBudgetBytes: budgetBytes, budgetScope: pager.budgetScope,
       };
     },
     faultCurve() { return pager.curve.report(); },
@@ -195,25 +219,69 @@ export async function createVera({
       low.set(mem.subarray(ptEnd, layout.heapBase), ptAddr);
       return backend.checkpoint(low, extra);
     },
-    close() { backend.close(); },
+    close() {
+      pager.persistBudget();
+      backend.close();
+    },
   };
   return vera;
 }
 
+// Minimum pages of the module's imported memory, read from the binary.
+function readLeb(u8, pos) {
+  let result = 0, shift = 0, byte;
+  do { byte = u8[pos++]; result += (byte & 0x7f) * 2 ** shift; shift += 7; } while (byte & 0x80);
+  return [result, pos];
+}
+export function memoryImportMinPages(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let pos = 8;
+  while (pos < u8.length) {
+    const id = u8[pos++];
+    let size;
+    [size, pos] = readLeb(u8, pos);
+    const end = pos + size;
+    if (id === 2) { // import section
+      let n, len;
+      [n, pos] = readLeb(u8, pos);
+      for (let i = 0; i < n; i++) {
+        [len, pos] = readLeb(u8, pos); pos += len; // module name
+        [len, pos] = readLeb(u8, pos); pos += len; // field name
+        const kind = u8[pos++];
+        if (kind === 0) [, pos] = readLeb(u8, pos); // function: type index
+        else if (kind === 1) { pos++; const fl = u8[pos++]; [, pos] = readLeb(u8, pos); if (fl & 1) [, pos] = readLeb(u8, pos); }
+        else if (kind === 2) { pos++; return readLeb(u8, pos)[0]; } // memory: flags, min
+        else if (kind === 3) pos += 2; // global: type, mutability
+        else return null;
+      }
+      return null;
+    }
+    pos = end;
+  }
+  return null;
+}
+
 // Instantiate a baseline build (ordinary heap growing with memory.grow).
 // maxBytes caps how far the heap may grow, to emulate a device/tab limit.
-export async function instantiateBase(wasm, { maxBytes = 4 * 2 ** 30 - WASM_PAGE, imports = {} } = {}) {
-  const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
-  const maximum = Math.floor(maxBytes / WASM_PAGE);
-  // The import's minimum is small; start at 16 MiB (or the cap) and let malloc grow it.
-  let memory;
-  for (let initial = Math.min(256, maximum); ; initial = Math.ceil(initial * 2)) {
+export async function instantiateBase(wasm, { maxBytes = MAX_PAGES * WASM_PAGE, imports = {} } = {}) {
+  const bytes = wasm instanceof WebAssembly.Module ? null : wasm;
+  const module = bytes ? await WebAssembly.compile(bytes) : wasm;
+  const maximum = Math.min(MAX_PAGES, Math.floor(maxBytes / WASM_PAGE));
+  const minPages = bytes ? memoryImportMinPages(bytes) : null;
+  if (minPages !== null && minPages > maximum) {
+    throw new RangeError(`vera: the program needs ${minPages * 64} KiB of memory to start, above the ${maximum * 64} KiB cap`);
+  }
+  // Start at 16 MiB (or the module's minimum, within the cap); malloc grows it.
+  let initial = Math.min(maximum, Math.max(256, minPages ?? 0));
+  for (;;) {
+    const memory = new WebAssembly.Memory({ initial, maximum });
     try {
-      memory = new WebAssembly.Memory({ initial, maximum });
       const instance = await WebAssembly.instantiate(module, { ...imports, env: { ...(imports.env || {}), memory } });
       return { instance, exports: instance.exports, memory };
     } catch (e) {
-      if (!(e instanceof WebAssembly.LinkError) || initial >= maximum) throw e;
+      // Only a too-small memory is worth retrying (when we could not read the minimum).
+      if (!(e instanceof WebAssembly.LinkError) || !/memory/i.test(e.message) || initial >= maximum) throw e;
+      initial = Math.min(maximum, initial * 2);
     }
   }
 }

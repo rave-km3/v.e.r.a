@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { buildApp } from '../tools/vera-build.mjs';
+import { buildApp, haveClang } from '../tools/vera-build.mjs';
 import { createVera, instantiateBase } from '../runtime/vera.mjs';
 import { MemoryBackend, NodeFileBackend, DelayBackend } from '../runtime/backends.mjs';
 
@@ -20,9 +20,8 @@ export function built(src) {
   const out = path.join(BUILD, name);
   const outs = [`${out}.vera.wasm`, `${out}.base.wasm`];
   const inputs = [path.join(ROOT, src), ...RUNTIME_SRC];
-  if (!outs.every((f) => fs.existsSync(f)) || Math.min(...outs.map((f) => fs.statSync(f).mtimeMs)) < newest(inputs)) {
-    buildApp([path.join(ROOT, src)], out);
-  }
+  const stale = !outs.every((f) => fs.existsSync(f)) || Math.min(...outs.map((f) => fs.statSync(f).mtimeMs)) < newest(inputs);
+  if (stale && haveClang()) buildApp([path.join(ROOT, src)], out); // else: use the prebuilt files
   return { vera: fs.readFileSync(`${out}.vera.wasm`), base: fs.readFileSync(`${out}.base.wasm`) };
 }
 

@@ -2,11 +2,13 @@
  * fuzz.c - differential test program.
  *
  * Performs a seeded random mix of memory operations over a heap buffer:
- * every access width and type, signed loads, unaligned (packed) accesses,
- * accesses that straddle page boundaries, memcpy/memmove/memset, and
- * read-modify-writes whose stored value comes from another load (the case
- * where a page fault could evict the frame being written). Returns a
- * checksum of everything it read plus the final buffer contents.
+ * every access width and type, signed loads, unaligned (packed) accesses
+ * including signed and float ones, accesses that straddle page boundaries,
+ * memcpy/memmove (both directions)/memset, and read-modify-writes whose
+ * stored value comes from another load. Returns a checksum of everything it
+ * read plus the final buffer contents. (The eviction-between-translate-and-
+ * store hazard is exercised specifically by test/fixtures/rmw.c, whose
+ * working set is just larger than the pool.)
  *
  * The paged build (vera) and the baseline build must return the same value
  * for the same arguments.
@@ -18,12 +20,15 @@ typedef struct __attribute__((packed)) { u32 v; } pu32;
 typedef struct __attribute__((packed)) { u64 v; } pu64;
 typedef struct __attribute__((packed)) { float v; } pf32;
 typedef struct __attribute__((packed)) { double v; } pf64;
+typedef struct __attribute__((packed)) { i16 v; } pi16;
+typedef struct __attribute__((packed)) { i32 v; } pi32;
 
 static u64 bits_f64(double d) { union { double d; u64 u; } c; c.d = d; return c.u; }
 static u64 bits_f32(float f) { union { float f; u32 u; } c; c.f = f; return c.u; }
 
 VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
 {
+    vera_app_status = 0;
     u32 len = mbytes << 20;
     u8 *buf = malloc(len);
     if (!buf) { vera_app_status = 1; return 0; }
@@ -65,16 +70,15 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
             break;
         }
         case 23: { /* unaligned signed 16-bit load straddling a page boundary */
-            u8 *x = (u8 *)(((u32)p & ~4095u) + 4095u);
-            if ((u32)x + 2 < (u32)buf + len) {
-                i16 t;
-                memcpy(&t, x, 2);
-                h = vera_mix(h, (u64)(i64)t);
-            }
+            volatile pi16 *x = (volatile pi16 *)(((u32)p & ~4095u) + 4095u);
+            if ((u32)x + 2 < (u32)buf + len) h = vera_mix(h, (u64)(i64)x->v);
             break;
         }
         case 24: memcpy(p, q, (r >> 50) & 127); break;
-        case 25: memmove(p, p + ((r >> 50) & 31), (r >> 40) & 63); break;
+        case 25: /* overlapping moves in both directions */
+            if (r & (1ull << 45)) memmove(p, p + ((r >> 50) & 31), (r >> 40) & 63);
+            else memmove(p + ((r >> 50) & 31), p, (r >> 40) & 63);
+            break;
         case 26: memset(p, (int)(r >> 33), (r >> 50) & 127); break;
         case 27: /* store whose value is loaded from elsewhere */
             *(u64 *)((u32)p & ~7u) += *(u64 *)((u32)q & ~7u);
@@ -88,7 +92,11 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
             h = vera_mix(h, *(buf + *slot));
             break;
         }
-        default: h = vera_mix(h, *p); break;
+        default: /* 31: signed and float loads through packed (unaligned) fields */
+            h = vera_mix(h, (u64)(i64)((volatile pi16 *)p)->v);
+            h = vera_mix(h, (u64)(i64)((volatile pi32 *)(p + 1))->v);
+            h = vera_mix(h, bits_f32(((volatile pf32 *)(p + 3))->v));
+            break;
         }
     }
     const u64 *w = (const u64 *)buf;

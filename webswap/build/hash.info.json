@@ -1,25 +1,30 @@
 {
   "vbase": 268435456,
+  "stackSize": 1048576,
   "pageSize": 4096,
   "sources": [
     "apps/hash.c"
   ],
   "instrument": {
-    "loadsFast": 15,
-    "storesFast": 22,
-    "storesWithTemps": 4,
+    "loadsFast": 22,
+    "storesFast": 32,
+    "storesWithTemps": 7,
     "loadsSlow": 0,
     "storesSlow": 0,
-    "skippedConst": 13,
-    "functions": 5,
+    "skippedConst": 27,
+    "stackChecks": 4,
+    "functions": 7,
     "runtimeFunctions": 11,
     "remainingHelperCalls": 0,
+    "sharedTemps": 7,
+    "outOfLine": [],
+    "stackTop": 1048576,
     "layout": {
       "format": "vera-webswap/1",
       "vbase": 268435456,
       "pageSize": 4096,
       "nvp": 983040,
-      "heapBase": 4980784,
+      "heapBase": 4980800,
       "minPages": 77
     }
   }

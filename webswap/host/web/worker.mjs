@@ -2,7 +2,7 @@
 // FileSystemSyncAccessHandle (synchronous OPFS I/O) only exists in Workers,
 // and page faults must be served synchronously, so everything happens here.
 import { createVera, instantiateBase, probeMaxMemoryBytes } from '../../runtime/vera.mjs';
-import { OPFSSyncBackend, MemoryBackend, PAGE } from '../../runtime/backends.mjs';
+import { OPFSSyncBackend, OPFSBudgetStore, MemoryBackend, PAGE } from '../../runtime/backends.mjs';
 import { OPFSStore } from '../../runtime/durable.mjs';
 
 const BUILD = new URL('../../build/', import.meta.url);
@@ -14,23 +14,34 @@ async function wasmBytes(app, kind) {
   return new Uint8Array(await r.arrayBuffer());
 }
 
+// Swap files left by a tab that was closed or killed mid-run are removed
+// once, before the first run (files still open in another tab are kept).
+const swept = OPFSSyncBackend.sweep().catch(() => 0);
+
+// The write budget is kept in OPFS, so it covers the last 24 hours of runs
+// in this browser profile, not just one run.
+const budgetStore = new OPFSBudgetStore();
+
 async function runVera({ app, mb, ops, seed, pool, backend }) {
-  const store = backend === 'opfs'
-    ? await OPFSSyncBackend.open(`vera-${app}-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`)
-    : new MemoryBackend();
-  const v = await createVera({ wasm: await wasmBytes(app, 'vera'), poolBytes: pool, backend: store });
-  const t0 = performance.now();
-  let value = null, error = null;
-  try { value = v.exports.run(mb, ops, seed); } catch (e) { error = String(e && e.message || e); }
-  const ms = performance.now() - t0;
-  const status = error ? -1 : v.exports.status();
-  const out = {
-    ok: status === 0, mode: 'vera', value: hex(value), status, error, ms,
-    stats: v.stats(), curve: v.faultCurve(),
-    meterTr: v.meter('tr', { wallMs: ms }), meterEn: v.meter('en', { wallMs: ms }),
-  };
-  if (store.closeAsync) await store.closeAsync(); else store.close();
-  return out;
+  await swept;
+  const store = backend === 'opfs' ? await OPFSSyncBackend.open() : new MemoryBackend();
+  try {
+    const v = await createVera({ wasm: await wasmBytes(app, 'vera'), poolBytes: pool, backend: store, budgetStore });
+    const t0 = performance.now();
+    let value = null, error = null;
+    try { value = v.exports.run(mb, ops, seed); } catch (e) { error = String(e && e.message || e); }
+    const ms = performance.now() - t0;
+    const status = error ? -1 : v.exports.status();
+    v.pager.persistBudget();
+    return {
+      ok: status === 0, mode: 'vera', value: hex(value), status, error, ms,
+      stats: v.stats(), curve: v.faultCurve(),
+      meterTr: v.meter('tr', { wallMs: ms }), meterEn: v.meter('en', { wallMs: ms }),
+    };
+  } finally {
+    if (store.closeAsync) await store.closeAsync(); else store.close();
+    await budgetStore.idle();
+  }
 }
 
 async function runBase({ app, mb, ops, seed, cap }) {
@@ -49,32 +60,40 @@ async function runBase({ app, mb, ops, seed, cap }) {
 }
 
 // Device facts that matter for paging: OPFS 4 KiB sync latency and the
-// largest WebAssembly.Memory this browser will give us. Browsers coarsen
+// largest WebAssembly.Memory this browser will reserve. Browsers coarsen
 // performance.now() (often to 100 us), so we time batches of operations and
-// report the mean per operation plus the slowest batch.
+// report the mean per operation plus the slowest batch. The file is small and
+// was just written, so reads are warm-cache numbers (a lower bound for a
+// swap file much larger than the OS cache). The memory number is an upper
+// bound: the browser reserved that much address space, which does not mean
+// the device can back it with RAM.
 async function probe() {
-  const store = await OPFSSyncBackend.open(`vera-probe-${Date.now()}.bin`);
-  const buf = new Uint8Array(PAGE).fill(7);
-  const N = 4000, BATCH = 100;
-  const measure = (op) => {
-    const per = [];
-    for (let b = 0; b < N / BATCH; b++) {
-      const t = performance.now();
-      for (let i = 0; i < BATCH; i++) op(b * BATCH + i);
-      per.push(((performance.now() - t) * 1000) / BATCH);
-    }
-    const mean = per.reduce((a, x) => a + x, 0) / per.length;
-    return { meanUs: +mean.toFixed(1), worstBatchMeanUs: +Math.max(...per).toFixed(1) };
-  };
-  const write = measure((i) => store.write(i, buf));
-  store.flush();
-  const read = measure((i) => store.read((i * 7919) % N, 1, buf));
-  await store.closeAsync();
-  return {
-    ok: true, mode: 'probe', opfs4kWrite: write, opfs4kRead: read,
-    maxMemoryMiB: probeMaxMemoryBytes(4 * 2 ** 30 - 65536) / 2 ** 20,
-    userAgent: navigator.userAgent,
-  };
+  await swept;
+  const store = await OPFSSyncBackend.open();
+  try {
+    const buf = new Uint8Array(PAGE).fill(7);
+    const N = 4000, BATCH = 100;
+    const measure = (op) => {
+      const per = [];
+      for (let b = 0; b < N / BATCH; b++) {
+        const t = performance.now();
+        for (let i = 0; i < BATCH; i++) op(b * BATCH + i);
+        per.push(((performance.now() - t) * 1000) / BATCH);
+      }
+      const mean = per.reduce((a, x) => a + x, 0) / per.length;
+      return { meanUs: +mean.toFixed(1), worstBatchMeanUs: +Math.max(...per).toFixed(1) };
+    };
+    const write = measure((i) => store.write(i, buf));
+    store.flush();
+    const read = measure((i) => store.read((i * 7919) % N, 1, buf));
+    return {
+      ok: true, mode: 'probe', opfs4kWrite: write, opfs4kReadWarm: read,
+      reservableMemoryMiB: probeMaxMemoryBytes(4 * 2 ** 30 - 65536) / 2 ** 20,
+      userAgent: navigator.userAgent,
+    };
+  } finally {
+    await store.closeAsync();
+  }
 }
 
 // Checkpoint/resume demo with test/fixtures/steps.c: run until `stopAt`
@@ -97,6 +116,14 @@ async function durable({ name, mb, seed, ops, ck, total, stopAt, reset }) {
     return { ok: true, mode: 'durable-reset' };
   }
   const store = await openStoreWithRetry(name);
+  try {
+    return await durableRun(store, { mb, seed, ops, ck, total, stopAt });
+  } catch (e) {
+    store.close();
+    throw e;
+  }
+}
+async function durableRun(store, { mb, seed, ops, ck, total, stopAt }) {
   const v = await createVera({ wasm: await wasmBytes('steps', 'vera'), poolBytes: 1 << 20, durableStore: store, resume: true });
   let steps = 0;
   if (v.resumed) steps = v.resumed.extra.steps;
@@ -110,7 +137,9 @@ async function durable({ name, mb, seed, ops, ck, total, stopAt, reset }) {
     if (steps % ck === 0) { v.checkpoint({ steps }); lastCheckpoint = steps; }
   }
   if (steps < total) {
-    v.exports.step(ops); // work that will be lost: no checkpoint follows
+    // Work that will be lost: no checkpoint follows. The store stays open, as
+    // it would in a tab that is about to be killed.
+    v.exports.step(ops);
     return { ok: true, mode: 'durable', resumedFrom, lastCheckpoint, finished: false };
   }
   const digest = hex(v.exports.digest());

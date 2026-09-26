@@ -43,6 +43,21 @@ try {
   await page.waitForFunction(() => typeof window.veraRun === 'function');
   results.userAgent = await page.evaluate(() => navigator.userAgent);
 
+  // A swap file left behind by a killed tab: the next worker must sweep it.
+  const opfsFiles = () => page.evaluate(async () => {
+    const out = [];
+    for await (const [name] of (await navigator.storage.getDirectory()).entries()) out.push(name);
+    return out.sort();
+  });
+  await page.evaluate(async () => {
+    const dir = await navigator.storage.getDirectory();
+    const w = await (await dir.getFileHandle('vera-swap-stale-test.bin', { create: true })).createWritable();
+    await w.write(new Uint8Array(8192));
+    await w.close();
+  });
+  await page.reload();
+  await page.waitForFunction(() => typeof window.veraRun === 'function');
+
   const cases = [
     { app: 'fuzz', mb: 16, ops: 200_000, seed: 1, pool: 1 * MB },
     { app: 'sort', mb: 64, ops: 0, seed: 1, pool: 16 * MB },
@@ -65,6 +80,21 @@ try {
       failed++;
       console.log(`FAIL ${c.app}: ${e.message}`);
     }
+  }
+
+  {
+    const files = await opfsFiles();
+    const swaps = files.filter((f) => f.startsWith('vera-swap-'));
+    const budget = await page.evaluate(async () => {
+      const f = await (await (await navigator.storage.getDirectory()).getFileHandle('vera-budget.json')).getFile();
+      return JSON.parse(await f.text());
+    }).catch(() => null);
+    results.opfsAfterRuns = { files, budget };
+    if (swaps.length) { failed++; console.log(`FAIL swap files left in OPFS: ${swaps.join(', ')}`); }
+    else console.log('ok   no swap files left in OPFS (each run deleted its own; the stale one was swept)');
+    const written = results.cases.reduce((a, c) => a + (c.writtenMiB ?? 0), 0);
+    if (!budget || Math.abs(budget.used / MB - written) > 1) { failed++; console.log(`FAIL write budget in OPFS ${JSON.stringify(budget)} != ${written.toFixed(1)} MiB written`); }
+    else console.log(`ok   write budget persisted in OPFS: ${(budget.used / MB).toFixed(1)} MiB counted in the current 24 h window`);
   }
 
   // The ordinary build with its Memory capped at the pool size must fail.
@@ -94,7 +124,7 @@ try {
 
   const probe = await page.evaluate(() => window.veraRun({ mode: 'probe' }));
   results.probe = probe;
-  console.log(`info OPFS 4 KiB sync read mean ${probe.opfs4kRead?.meanUs} µs (worst batch ${probe.opfs4kRead?.worstBatchMeanUs}); write mean ${probe.opfs4kWrite?.meanUs} µs; max Memory ${probe.maxMemoryMiB} MiB`);
+  console.log(`info OPFS 4 KiB sync read (warm cache) mean ${probe.opfs4kReadWarm?.meanUs} µs (worst batch ${probe.opfs4kReadWarm?.worstBatchMeanUs}); write mean ${probe.opfs4kWrite?.meanUs} µs; reservable Memory (upper bound) ${probe.reservableMemoryMiB} MiB`);
 } finally {
   await ctx.close();
   server.close();

@@ -8,6 +8,7 @@ typedef struct __attribute__((packed)) { u8 tag; u64 a; u32 b; u16 c; double d; 
 
 VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
 {
+    vera_app_status = 0;
     u32 n = (mbytes << 20) / sizeof(rec);
     rec *r = malloc((size_t)n * sizeof(rec));
     if (!r) { vera_app_status = 1; return 0; }
@@ -25,5 +26,6 @@ VERA_EXPORT("run") u64 run(u32 mbytes, u32 ops, u32 seed)
         union { double d; u64 u; } c; c.d = p->d;
         h = vera_mix(h, p->a ^ c.u);
     }
+    free(r);
     return h;
 }

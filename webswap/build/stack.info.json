@@ -3,15 +3,15 @@
   "stackSize": 1048576,
   "pageSize": 4096,
   "sources": [
-    "apps/blur.c"
+    "test/fixtures/stack.c"
   ],
   "instrument": {
-    "loadsFast": 29,
-    "storesFast": 25,
+    "loadsFast": 20,
+    "storesFast": 36,
     "storesWithTemps": 7,
     "loadsSlow": 0,
     "storesSlow": 0,
-    "skippedConst": 27,
+    "skippedConst": 26,
     "stackChecks": 4,
     "functions": 7,
     "runtimeFunctions": 11,
