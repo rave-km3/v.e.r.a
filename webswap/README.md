@@ -70,6 +70,17 @@ WebAssembly'de işlemci düzeyinde sayfa hatası yok. Bu yüzden WebSwap bunu ya
   bir adres çeviricisinden geçirir. Hizalı erişimler hızlı yoldan, hizasız olabilecekler bayt bayt güvenli yoldan
   gider (sayfa sınırını aşsa bile doğru çalışır). Yığın işaretçisinin her değişimi denetlenir: yığın taşarsa
   program sanal bölgeye sessizce yazmak yerine anlaşılır bir hatayla durur.
+- **Çeviriyi ucuzlatan dört hile** (her biri ayrı ölçülüp yalnızca işe yarayınca tutuldu):
+  - *Tek nadir dal:* Sayfa hatası ve sayfa sınırı denetimi, satır içi yolda tek bir nadiren alınan dala indirildi;
+    asıl iş satır dışındaki bir fonksiyonda. Hata çağrısı "geri dönmez" olarak işaretlendi, böylece JIT sıcak
+    yolda gereksiz kayıt (register) saklamıyor.
+  - *Ön kaydırmalı sayfa tablosu indeksi:* Tablodaki girdinin adresi bir çıkarma işlemi daha az ile hesaplanıyor.
+  - *Aynı tabanlı erişimleri birleştirme:* `p->a`, `p->b` ya da `a[i]`, `a[i+1]` gibi, aralarında sayfa hatasına
+    yol açabilecek başka bir şey olmayan erişimler tek çeviriyle yapılıyor. Erişimlerden biri çalışmayabilecekse
+    (bir dalın arkasındaysa) çeviri "bakıp geçer": sayfa hatası üretmez, gerekirse eski tek tek yola düşer.
+  - *Döngü içi yazılım TLB'si:* Döngüde adım adım ilerleyen erişimler, son çevrilen sayfayı yerel değişkenlerde
+    hatırlar. Her sayfa hatasında, her fonksiyon çağrısından sonra ve her döngü girişinde bu bellek boşaltılır,
+    çünkü o anlarda sayfalayıcı sayfaları taşımış olabilir.
 - **Sıralama kuralı:** `*p = *q` gibi bir satırda, `q` okunurken oluşan sayfa hatası `p`'nin çerçevesini başka
   sayfaya vermiş olabilir. Bu yüzden saklanacak değer önce hesaplanır, hedef adres en son çevrilir. Kuralı
   bozan bir sürümün bu testi geçemediği de ayrıca sınanıyor.
