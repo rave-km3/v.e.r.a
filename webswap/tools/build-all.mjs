@@ -7,7 +7,7 @@ import { buildApp, haveClang } from './vera-build.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCES = ['fuzz', 'sort', 'blur', 'hash', 'rand', 'chase', 'packed'].map((a) => `apps/${a}.c`)
-  .concat(['test/fixtures/straddle.c', 'test/fixtures/steps.c', 'test/fixtures/rmw.c', 'test/fixtures/stack.c', 'test/fixtures/alloc.c']);
+  .concat(['test/fixtures/straddle.c', 'test/fixtures/steps.c', 'test/fixtures/rmw.c', 'test/fixtures/stack.c', 'test/fixtures/alloc.c', 'test/fixtures/merge.c', 'test/fixtures/tlb.c']);
 if (!haveClang()) {
   const missing = SOURCES.map((s) => path.join(ROOT, 'build', path.basename(s, '.c')))
     .filter((o) => !fs.existsSync(`${o}.vera.wasm`) || !fs.existsSync(`${o}.base.wasm`));
@@ -22,5 +22,6 @@ for (const src of SOURCES) {
   const name = path.basename(src, '.c');
   const info = buildApp([path.join(ROOT, src)], path.join(ROOT, 'build', name));
   const r = info.instrument;
-  console.log(`${name.padEnd(9)} fast ${r.loadsFast + r.storesFast}, byte-wise ${r.loadsSlow + r.storesSlow}, ordered stores ${r.storesWithTemps}, helper calls left ${r.remainingHelperCalls}`);
+  console.log(`${name.padEnd(9)} fast ${r.loadsFast + r.storesFast}, byte-wise ${r.loadsSlow + r.storesSlow}, ordered stores ${r.storesWithTemps}, ` +
+    `merged ${r.mergedAccesses} in ${r.mergedGroups} groups, TLB entries ${r.tlbEntries} (${r.tlbSites} sites), helper calls left ${r.remainingHelperCalls}`);
 }

@@ -51,11 +51,16 @@ export function buildApp(sources, outBase, { vbase = 0x10000000, stackSize = 1 <
     '-Wall', '-Wno-unused-function', `-I${RUNTIME}`, `-DVERA_VBASE=${vbase >>> 0}u`, ...cflags,
   ];
   const ld = ['--no-entry', '--import-memory', '--stack-first', '-z', `stack-size=${stackSize}`, '--export=__heap_base'];
+  // The soft-MMU is always optimized, whatever cflags say: its slow paths are
+  // called from every function, also from leaf functions that keep their
+  // stack frame below __stack_pointer without moving it, so they must not
+  // use the shadow stack themselves (at -O0 they do; instrument.mjs checks).
+  const SOFTMMU = path.join(RUNTIME, 'softmmu.c');
   let objCount = 0;
   const run = (paged, files, out) => {
     const objs = files.map((f) => {
       const o = `${out}.${objCount++}.o`;
-      exec(clang, [...cc, `-DVERA_PAGED=${paged}`, '-c', f, '-o', o]);
+      exec(clang, [...cc, ...(f === SOFTMMU ? ['-O2'] : []), `-DVERA_PAGED=${paged}`, '-c', f, '-o', o]);
       return o;
     });
     try {
@@ -74,8 +79,9 @@ export function buildApp(sources, outBase, { vbase = 0x10000000, stackSize = 1 <
   const tmp = path.join(tmpDir, path.basename(outBase));
   try {
     const linked = `${tmp}.linked.wasm`;
-    run(1, [...sources, path.join(RUNTIME, 'vera-libc.c'), path.join(RUNTIME, 'softmmu.c')], linked);
+    run(1, [...sources, path.join(RUNTIME, 'vera-libc.c'), SOFTMMU], linked);
     const { binary, report } = instrument(fs.readFileSync(linked), { vbase, ...instrumentOptions });
+    if (!quiet) for (const w of report.warnings) console.warn(`vera-build: warning: ${w}`);
     fs.writeFileSync(`${tmp}.vera.wasm`, binary);
     fs.renameSync(`${tmp}.vera.wasm`, `${outBase}.vera.wasm`);
 
