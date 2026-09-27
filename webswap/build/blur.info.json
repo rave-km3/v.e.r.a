@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "apps/blur.c"
+  ],
+  "instrument": {
+    "loadsFast": 29,
+    "storesFast": 25,
+    "storesWithTemps": 7,
+    "loadsSlow": 0,
+    "storesSlow": 0,
+    "skippedConst": 27,
+    "stackChecks": 4,
+    "functions": 7,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 7,
+    "mergedGroups": 8,
+    "mergedAccesses": 20,
+    "mergeFallbacks": 8,
+    "mergePeeks": 3,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 7,
+    "tlbFunctions": 1,
+    "tlbEntries": 6,
+    "tlbSites": 6,
+    "tlbGroupSites": 5,
+    "tlbPeekSites": 3,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

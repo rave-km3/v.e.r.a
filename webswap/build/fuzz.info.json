@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "apps/fuzz.c"
+  ],
+  "instrument": {
+    "loadsFast": 75,
+    "storesFast": 97,
+    "storesWithTemps": 50,
+    "loadsSlow": 8,
+    "storesSlow": 6,
+    "skippedConst": 27,
+    "stackChecks": 4,
+    "functions": 11,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 50,
+    "mergedGroups": 6,
+    "mergedAccesses": 25,
+    "mergeFallbacks": 6,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 11,
+    "tlbFunctions": 5,
+    "tlbEntries": 26,
+    "tlbSites": 88,
+    "tlbGroupSites": 3,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

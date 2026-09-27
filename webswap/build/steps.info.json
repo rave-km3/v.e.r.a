@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "test/fixtures/steps.c"
+  ],
+  "instrument": {
+    "loadsFast": 22,
+    "storesFast": 27,
+    "storesWithTemps": 7,
+    "loadsSlow": 0,
+    "storesSlow": 0,
+    "skippedConst": 39,
+    "stackChecks": 4,
+    "functions": 9,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 7,
+    "mergedGroups": 6,
+    "mergedAccesses": 15,
+    "mergeFallbacks": 5,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 9,
+    "tlbFunctions": 2,
+    "tlbEntries": 3,
+    "tlbSites": 3,
+    "tlbGroupSites": 2,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980832,
+      "minPages": 77
+    }
+  }
+}

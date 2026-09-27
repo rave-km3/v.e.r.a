@@ -1,0 +1,8 @@
+node_modules/
+# intermediate and temporary build files (final *.vera.wasm / *.base.wasm are kept
+# so the demo page works without a C toolchain)
+build/*.o
+build/*.linked.wasm
+build/*.[0-9]*.[0-9]*.*
+build/.vera-tmp-*/
+results/*quick*

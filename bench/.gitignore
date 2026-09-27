@@ -1,0 +1,12 @@
+# compiled benchmark binaries
+ram_latency
+ram_bandwidth
+mkfile
+storage_latency
+storage_bandwidth
+mmap_fault
+swap_fault
+*.o
+# test files and captured output
+tmp/
+results*.txt

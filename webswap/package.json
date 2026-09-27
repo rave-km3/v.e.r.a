@@ -1,0 +1,17 @@
+{
+  "name": "vera-webswap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Demand-paged virtual memory for WebAssembly, backed by storage (OPFS in browsers, files in Node)",
+  "scripts": {
+    "build": "node tools/build-all.mjs",
+    "test": "node tools/build-all.mjs && node --test test/*.test.mjs",
+    "test:browser": "node test/browser.mjs",
+    "bench": "node bench/run-all.mjs"
+  },
+  "dependencies": {
+    "binaryen": "132.0.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "test/fixtures/alloc.c"
+  ],
+  "instrument": {
+    "loadsFast": 46,
+    "storesFast": 70,
+    "storesWithTemps": 25,
+    "loadsSlow": 0,
+    "storesSlow": 1,
+    "skippedConst": 35,
+    "stackChecks": 8,
+    "functions": 13,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 25,
+    "mergedGroups": 6,
+    "mergedAccesses": 23,
+    "mergeFallbacks": 6,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 13,
+    "tlbFunctions": 4,
+    "tlbEntries": 14,
+    "tlbSites": 49,
+    "tlbGroupSites": 3,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

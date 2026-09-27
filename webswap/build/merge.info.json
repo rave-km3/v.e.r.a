@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "test/fixtures/merge.c"
+  ],
+  "instrument": {
+    "loadsFast": 47,
+    "storesFast": 63,
+    "storesWithTemps": 13,
+    "loadsSlow": 0,
+    "storesSlow": 0,
+    "skippedConst": 34,
+    "stackChecks": 4,
+    "functions": 13,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 13,
+    "mergedGroups": 14,
+    "mergedAccesses": 63,
+    "mergeFallbacks": 13,
+    "mergePeeks": 4,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 13,
+    "tlbFunctions": 3,
+    "tlbEntries": 6,
+    "tlbSites": 13,
+    "tlbGroupSites": 4,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980816,
+      "minPages": 77
+    }
+  }
+}

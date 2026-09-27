@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "test/fixtures/rmw.c"
+  ],
+  "instrument": {
+    "loadsFast": 21,
+    "storesFast": 30,
+    "storesWithTemps": 8,
+    "loadsSlow": 0,
+    "storesSlow": 0,
+    "skippedConst": 27,
+    "stackChecks": 4,
+    "functions": 7,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 8,
+    "mergedGroups": 5,
+    "mergedAccesses": 17,
+    "mergeFallbacks": 5,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 7,
+    "tlbFunctions": 1,
+    "tlbEntries": 2,
+    "tlbSites": 2,
+    "tlbGroupSites": 2,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

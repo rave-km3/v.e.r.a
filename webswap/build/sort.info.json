@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "apps/sort.c"
+  ],
+  "instrument": {
+    "loadsFast": 32,
+    "storesFast": 35,
+    "storesWithTemps": 7,
+    "loadsSlow": 0,
+    "storesSlow": 3,
+    "skippedConst": 28,
+    "stackChecks": 6,
+    "functions": 7,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 7,
+    "mergedGroups": 12,
+    "mergedAccesses": 25,
+    "mergeFallbacks": 4,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 7,
+    "tlbFunctions": 1,
+    "tlbEntries": 5,
+    "tlbSites": 7,
+    "tlbGroupSites": 1,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "vbase": 268435456,
+  "stackSize": 1048576,
+  "pageSize": 4096,
+  "sources": [
+    "test/fixtures/straddle.c"
+  ],
+  "instrument": {
+    "loadsFast": 17,
+    "storesFast": 22,
+    "storesWithTemps": 7,
+    "loadsSlow": 0,
+    "storesSlow": 0,
+    "skippedConst": 25,
+    "stackChecks": 4,
+    "functions": 7,
+    "runtimeFunctions": 18,
+    "remainingHelperCalls": 0,
+    "sharedTemps": 7,
+    "mergedGroups": 3,
+    "mergedAccesses": 7,
+    "mergeFallbacks": 3,
+    "mergePeeks": 0,
+    "unmerged": [],
+    "outOfLine": [],
+    "inlineFunctions": 7,
+    "tlbFunctions": 0,
+    "tlbEntries": 0,
+    "tlbSites": 0,
+    "tlbGroupSites": 0,
+    "tlbPeekSites": 0,
+    "warnings": [],
+    "stackTop": 1048576,
+    "layout": {
+      "format": "vera-webswap/1",
+      "vbase": 268435456,
+      "pageSize": 4096,
+      "nvp": 983040,
+      "heapBase": 4980800,
+      "minPages": 77
+    }
+  }
+}

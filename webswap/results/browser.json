@@ -1,0 +1,124 @@
+{
+ "browser": "chromium 141.0.7390.37",
+ "cases": [
+  {
+   "app": "fuzz",
+   "mb": 16,
+   "ops": 200000,
+   "seed": 1,
+   "pool": 1,
+   "compress": 0,
+   "tierHits": 0,
+   "ok": true,
+   "ms": 2186,
+   "value": "480cb3bb5785fc9e",
+   "expected": "480cb3bb5785fc9e",
+   "backend": "opfs",
+   "readMiB": 1297.7,
+   "writtenMiB": 448.8,
+   "memoryMiB": 5.8,
+   "error": null
+  },
+  {
+   "app": "sort",
+   "mb": 64,
+   "ops": 0,
+   "seed": 1,
+   "pool": 16,
+   "compress": 0,
+   "tierHits": 0,
+   "ok": true,
+   "ms": 2238,
+   "value": "8b05e9aa160f998b",
+   "expected": "8b05e9aa160f998b",
+   "backend": "opfs",
+   "readMiB": 767.8,
+   "writtenMiB": 324,
+   "memoryMiB": 20.8,
+   "error": null
+  },
+  {
+   "app": "hash",
+   "mb": 32,
+   "ops": 200000,
+   "seed": 1,
+   "pool": 8,
+   "compress": 0,
+   "tierHits": 0,
+   "ok": true,
+   "ms": 12155,
+   "value": "abdad35434228d2",
+   "expected": "abdad35434228d2",
+   "backend": "opfs",
+   "readMiB": 3601.4,
+   "writtenMiB": 3034.6,
+   "memoryMiB": 12.8,
+   "error": null
+  },
+  {
+   "app": "fuzz",
+   "mb": 16,
+   "ops": 200000,
+   "seed": 2,
+   "pool": 1,
+   "compress": 1,
+   "tierHits": 127376,
+   "ok": true,
+   "ms": 3085,
+   "value": "f5cfb8e1c4095e39",
+   "expected": "f5cfb8e1c4095e39",
+   "backend": "opfs",
+   "readMiB": 383.5,
+   "writtenMiB": 264.4,
+   "memoryMiB": 5.8,
+   "error": null
+  }
+ ],
+ "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36",
+ "opfsAfterRuns": {
+  "files": [
+   "vera-budget.json"
+  ],
+  "budget": {
+   "windowStart": 1790475928080,
+   "used": 4269481984
+  }
+ },
+ "cappedBaseline": {
+  "ok": false,
+  "error": null,
+  "status": 1
+ },
+ "durable": {
+  "first": {
+   "ok": true,
+   "mode": "durable",
+   "resumedFrom": null,
+   "lastCheckpoint": 20,
+   "finished": false
+  },
+  "second": {
+   "ok": true,
+   "mode": "durable",
+   "resumedFrom": 20,
+   "lastCheckpoint": 40,
+   "finished": true,
+   "digest": "f4c1e68de506ba0e"
+  },
+  "expected": "f4c1e68de506ba0e"
+ },
+ "probe": {
+  "ok": true,
+  "mode": "probe",
+  "opfs4kWrite": {
+   "meanUs": 9.6,
+   "worstBatchMeanUs": 25
+  },
+  "opfs4kReadWarm": {
+   "meanUs": 1.8,
+   "worstBatchMeanUs": 4
+  },
+  "reservableMemoryMiB": 4095.9375,
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.7390.37 Safari/537.36"
+ }
+}
