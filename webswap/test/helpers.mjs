@@ -39,7 +39,14 @@ export async function runBase(bytes, args, opts = {}) {
 }
 
 export async function runVera(bytes, args, { poolBytes, backend = 'mem', ...rest } = {}) {
-  const v = await createVera({ wasm: bytes, poolBytes, backend: makeBackend(backend), ...rest });
+  const be = makeBackend(backend);
+  let v;
+  try {
+    v = await createVera({ wasm: bytes, poolBytes, backend: be, ...rest });
+  } catch (e) {
+    be.close(); // no temp swap file left behind
+    throw e;
+  }
   try {
     const value = v.exports.run(...args);
     return { value, status: v.exports.status(), stats: v.stats(), curve: v.faultCurve(), vera: v };

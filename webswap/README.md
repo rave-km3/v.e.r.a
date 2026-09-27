@@ -80,6 +80,8 @@ WebAssembly'de işlemci düzeyinde sayfa hatası yok. Bu yüzden WebSwap bunu ya
   verilirse (`FileBudgetStore`, tarayıcıda `OPFSBudgetStore`) sayım çalıştırmalar arasında birikir; verilmezse
   yalnızca o çalıştırmayı kapsar. Aşılınca bir kez uyarır ya da işi durdurur (`onBudget: 'throw'`). Uyarı,
   sayfa hatasının içinde değil, hata döndükten sonra iletilir.
+- **Sıkıştırılmış katman** (isteğe bağlı, `runtime/compress.mjs`): Havuzdan çıkan sayfalar diske gitmeden önce
+  sıkıştırılıp JS belleğinde tutulabilir; ayrıntılar [aşağıda](#sıkıştırılmış-katman-isteğe-bağlı).
 - **Sayaç** (`runtime/meter.mjs`): Türkçe/İngilizce özet. Kaç sayfa hatası oldu, diske ne kadar yazıldı, havuz
   iki ya da dört kat büyük olsaydı diskten kaç sayfa okunurdu (yaklaşık tahmin).
 
@@ -123,18 +125,27 @@ gigabaytlara ulaşabiliyor. WebSwap bunu gizlemiyor, sayacında gösteriyor.
 
 ### Doğruluk
 
-- 97 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle aynı 64 bit sağlama toplamını
+- 132 otomatik test (`npm test`). En önemlisi: sayfalanan sürüm, normal sürümle aynı 64 bit sağlama toplamını
   veriyor. Bunu iki grup test kontrol ediyor: her yükleme/saklama türünü, hizasız ve sayfa sınırını aşan
   erişimleri deneyen `fuzz` programı 3 seed × 5 havuz/depolama ayarıyla (havuz 64 KiB'a, yani 16 sayfaya kadar
   küçültülüyor) ve 6 demo program, verinin %25'i kadar havuz ve dosya depolamayla.
+- Sıkıştırılmış katman testleri: sıkıştırıcının her sayfa türünü aynen geri açması ve en kötü durum sınırı,
+  katmanın belleğinin bütçe içinde kalan, baştan ayrılmış tipli diziler olması, dizinin ve yaş sırasının bir modelle
+  karşılaştırılması, kirli/temiz ayrımı, taşma sırası, `flush`, sıkıştırılmış tutulduktan sonra değişen sayfa, önden
+  okumanın katmandaki güncel sayfayı diskteki eski kopyayla ezmemesi ve hiç kullanılmayan önden okunmuş sayfaların
+  katmana girmemesi, depolama hataları, yazma bütçesinin yalnızca diske yazılanı sayması, 7200 rastgele işlemden
+  (arada depolama hatalarıyla) sonra her sayfanın her kopyasının (çerçeve, katman, disk) tutarlı olması; `fuzz` ve 6
+  demo program küçük havuz + küçük katmanla, sıralama kuralı katmanla, kontrol noktasının her aşamasında bir çökmeden
+  sonra doğru kontrol noktasından devam (büyük ve küçük katmanla).
 - Sağlamlık testleri: sıralama kuralı (ve onu bozan sürümün yakalanması), yığın taşması, bellek ayırıcının
   parçalanmaya dayanıklılığı, `calloc`'un yeni bellek için diske yazmaması, 6000 dallı bir `switch` (derin iç içe
   kod), çok büyük fonksiyonların hızlı derlenmesi, takas dosyasının izinleri ve bütçe deposu.
 - Tarayıcı testi (`node test/browser.mjs`): Chromium'da, bir Worker içinde OPFS'e sayfalayarak 3 uygulama
-  çalışıyor; sonuçlar Node'daki normal sürümle aynı. Belleği sınırlanmış normal sürüm aynı işte çöküyor. OPFS'te
+  (biri ayrıca sıkıştırılmış katmanla) çalışıyor; sonuçlar Node'daki normal sürümle aynı. Belleği sınırlanmış normal sürüm aynı işte çöküyor. OPFS'te
   takas dosyası kalmıyor (öldürülen sekmeden kalan eski dosya temizleniyor), yazma bütçesi OPFS'e kaydediliyor.
   Sayfa, kontrol noktasından sonra yeniden yüklendiğinde OPFS'ten kaldığı yerden devam ediyor.
-- Çalışma ortamı testi (`node test/cross-runtime.mjs`): Node (V8) ve Bun (JavaScriptCore) aynı sonucu veriyor.
+- Çalışma ortamı testi (`node test/cross-runtime.mjs`): Node (V8) ve Bun (JavaScriptCore) aynı sonucu veriyor
+  (sıkıştırılmış katmanla da).
 
 ---
 
@@ -147,7 +158,7 @@ wasm-ld (LLVM 16+) gerekir.
 ```sh
 cd webswap
 npm install                      # binaryen (dönüştürücü için)
-npm test                         # derle (clang varsa) + 97 test
+npm test                         # derle (clang varsa) + 132 test
 
 # Komut satırından
 node host/node-run.mjs --app sort --mb 256 --pool 32M --backend file
@@ -261,6 +272,77 @@ vera.checkpoint({ adim: 120 });   // programın içindeyken değil, çağrılar 
 
 ---
 
+## Sıkıştırılmış katman (isteğe bağlı)
+
+Linux'taki zswap/zram, macOS'un sıkıştırılmış belleği ya da Samsung'un "RAM Plus"ı gibi: havuzdan çıkan sayfalar
+diske gitmeden önce sıkıştırılıp JS belleğinde sabit bir bütçede tutulur. Sayfa hatası önce oraya bakar; sayfa
+oradaysa diskten okumak yerine açılır.
+
+```js
+const vera = await createVera({ wasm, poolBytes: 16 << 20, compressBytes: 16 << 20, backend });
+```
+```
+node host/node-run.mjs --app rand --mb 128 --ops 200000 --pool 16M --compress 16M --backend delay:50:100
+```
+
+- **Varsayılan olarak kapalı.** `compressBytes` verilmezse (ya da 0 ise) katman yok; verilirse en az 16 KiB olmalı,
+  sayı olmayan ya da daha küçük bir değer açık bir hatayla reddedilir.
+- **Sıkıştırıcı** (`runtime/compress.mjs`): WK tipi, kelime tabanlı (macOS'taki WKdm ailesi). Her 32 bitlik kelime
+  sıfır mı, 16 girişlik küçük bir sözlükteki bir kelimenin aynısı mı, yoksa yalnızca üst 22 biti mi aynı, ona bakar.
+  Sayaçlar, dizinler, küçük tamsayılar, seyrek tablolar ve sıfırlar iyi sıkışır; rastgele veri ve zaten
+  sıkıştırılmış veri (görüntü, ses) sıkışmaz. Bağımlılık yok, düz JS. Sıkışmayan bir sayfa bu biçimde en çok %6,4
+  büyür (1024 kelime yerine 1090); katman böyle sayfaları hiç tutmaz.
+- **Ne girer:** Yalnızca sayfanın 5/8'ine (1,6:1) sığacak kadar sıkışan sayfalar. Daha az sıkışan bir sayfa, iyi
+  sıkışan birkaç sayfanın yerini kaplar ve sıkıştırıp açmanın maliyeti kazandırdığı disk okumasına yaklaşır (sıralı
+  anahtarlarla ~1,5:1 sayfaları tutmak `sort`'u yavaşlattı). Girmeyen kirli sayfa diske gider, temiz sayfa atılır;
+  yani katman olmasaydı ne olacaksa o olur. Önden okunup hiç kullanılmadan havuzdan çıkan sayfalar da girmez
+  (diskte zaten varlar; kullanılmış sayfaları katmandan itmesinler). Sıkışmadığı görülen ve o zamandan beri
+  değişmeyen bir sayfa bir daha denenmez; rastgele veride sıkıştırıcı ilk çeyrekte vazgeçer (~1,5 µs), sıralı
+  anahtarlar gibi neredeyse sığan sayfalarda ise ancak sona doğru (~10 µs).
+- **Kirli/temiz:** Katman ile havuz aynı sayfayı hiçbir zaman birlikte tutmaz. Katman dolunca en eski sayfa
+  (havuzdan en önce çıkmış olan) çıkar: diskte kopyası olmayan (kirli) sayfa diske yazılır, kopyası olan (temiz)
+  sayfa yazılmadan atılır. Katmandaki kirli bir sayfa havuza kirli olarak döner. Önden okuma katmandaki bir sayfada
+  durur (diskteki kopyası eski olabilir). `vera.flush()` ve `vera.checkpoint()` katmandaki kirli sayfaları da diske
+  yazar; `vera.close()` ise hiç sayfa yazmaz: son `flush()`/`checkpoint()`'tan sonra değişen sayfalar, havuzda da
+  katmanda da olsalar, atılır (varsayılan takas dosyası kapanınca zaten silinir; `keep: true` ile tutulan bir dosya
+  için önce `flush()` çağrılmalı). Yazma bütçesi yalnızca gerçekten diske yazılanı sayar; katmana giren sayfa sayılmaz.
+- **Dayanıklı kontrol noktalarıyla (`durableStore`) birlikte kullanılabilir:** Katman da sayfa havuzu gibi uçucu
+  bellektir. `checkpoint()` önce katmandaki kirli sayfaları yazar, sonra kaydeder; iki kontrol noktası arasında
+  katmandan taşan sayfalar, diğer sayfalar gibi kaydedilmemiş yuvalara gider. Kontrol noktasının her aşamasında
+  çökme testi katmanla da yapılıyor.
+- **Bellek bütçesi kesin:** Katman `compressBytes` kadar belleği baştan ve yalnızca tipli dizi (typed array)
+  olarak ayırır, sonra hiç büyümez: 128 baytlık bloklar (sayfanın kaydı - hangi sayfa, boyu, temiz mi, yaş
+  sırasındaki komşuları - ilk bloğun 16 baytında), blok başına 4 bayt zincir bağlantısı, blok başına 1,5 yuvalık
+  dizin ve ~9 KiB geçici tampon. Toplamları bütçeyi aşmaz (test ediliyor). Bunun dışında yalnızca sıkıştırıcının
+  bütün katmanlarca paylaşılan ~6 KiB'lık tamponları var; "bu sayfa sıkışmıyor" bilgisi, sayfa hatası
+  işleyicisinin (`pager.mjs`) zaten tuttuğu bir dizinin bir biti.
+
+Aynı sayfa belleğiyle ölçüm ([results/COMPRESS.md](results/COMPRESS.md), `node --expose-gc bench/compress.mjs`):
+A = havuz yığının %25'i; B = havuz %12,5 + sıkıştırılmış katman %12,5 (katmanın ayırdığı bellek dahil, toplam
+aynı). **Depolama benzetimdir (SIMULATED):** bellekte tutulan sayfalar, okuma başına 50 µs ve yazılan sayfa
+başına 100 µs bekleyerek; gerçek bir disk, flaş ya da OPFS yok. "Gecikmesiz" sütunu aynı işin bellek deposuyla,
+yani yalnızca katmanın işlemci maliyeti. Verinin sıkışması da ölçüldü: A'nın diske yazdığı her sayfa sınırsız
+sıkıştırılarak. Her hücre 2 çalıştırmanın en hızlısı.
+
+| İş | Verinin sıkışması (ölçülen) | B'nin A'ya göre süresi, yavaş depolama (SIMULATED) | Gecikmesiz | Diskten okuma | Diske yazılan |
+|---|---|---:|---:|---:|---:|
+| hash (8 MiB tablo, 100 bin arama) | 4,0:1, sayfaların %100'ü katmana sığar (yarısı boş tablo) | **-%38** | +%697 | -%43 | -%52 |
+| rand (128 MiB, 200 bin güncelleme) | 3,3:1, %100 (sayaç dizisi) | **-%18** | +%320 | -%31 | -%27 |
+| sort (128 MiB) | 1,03:1, %0,2 (rastgele anahtarlar) | +%3 | +%22 | -%1 | 0 |
+| blur (128 MiB) | 0,94:1, %0 (rastgele pikseller) | +%1 | +%6 | 0 | 0 |
+
+Dürüst sonuç: **Yalnızca verisi sıkışan işlerde ve depolama gerçekten yavaşken işe yarıyor.** Rastgele veride
+katman boş kalır ve B, küçük bir havuz artı sıkıştırmayı deneme maliyetidir (yavaş depolamada %1-3, gecikmesizde
+%6-22). Sıkıştırma ve açma JS'te sayfa başına 4-6 µs sürer (sıralı anahtarlar gibi karışık sayfalarda ~10 µs);
+depolama hızlıysa bu maliyet kazancı aşar: gecikmesiz bellek deposunda B, `rand`'de 4, `hash`'te 8 kat yavaş.
+Tarayıcı testinde OPFS'ten ısınmış önbellekle bir sayfa okumak ~2 µs sürdü, işletim sisteminin dosya önbelleğinden
+okumak da benzer: bu depolamalarda katmanı açmayın. Benzetilmiş gecikmelerle yapılan taramada B ile A, okuma/yazma
+başına `hash`'te ~10/20 µs'de, `rand`'de ~20/40 µs'de başa baş (fark %5'ten az); B ancak bunun üstünde açıkça öne
+geçiyor, daha hızlı depolamada katmanın harcadığı işlemci zamanı kazandırdığı depolama zamanından fazla. Diske daha
+az yazılması (burada %27-52) flaş aşınması ve yazma bütçesi için ayrıca yararlı.
+
+---
+
 ## Hangi cihazlarda?
 
 | Ortam | Durum |
@@ -317,6 +399,7 @@ runtime/vera.h           tipler, küçük libc bildirimleri, yardımcılar
 runtime/vera-libc.c      malloc/free/calloc/realloc/memcpy/... (sanal bölgede)
 runtime/softmmu.c        adres çevirici ve bayt bayt güvenli yol
 runtime/pager.mjs        sayfa hatası işleyicisi (CLOCK, dirty, önden okuma, bütçe, tahmin)
+runtime/compress.mjs     sıkıştırılmış sayfa katmanı (WK tipi sıkıştırıcı, blok deposu)
 runtime/backends.mjs     depolama: bellek, dosya, OPFS, gecikme benzetimi; bütçe depoları
 runtime/vera.mjs         createVera(), instantiateBase(), read/write köprüsü
 runtime/meter.mjs        TR/EN sayaç
@@ -324,8 +407,9 @@ runtime/durable.mjs      dayanıklı kontrol noktaları (çift yuvalı gölge sa
 apps/                    demo programlar: sort, blur, hash, rand, chase, packed, fuzz
 host/node-run.mjs        komut satırı
 host/web/                tarayıcı sayfası + Worker + küçük sunucu
-test/                    97 test + tarayıcı + çalışma ortamı testleri
+test/                    132 test + tarayıcı + çalışma ortamı testleri
 bench/run-all.mjs        ölçüm matrisi → results/BENCH.md
+bench/compress.mjs       sıkıştırılmış katman, aynı bellekle → results/COMPRESS.md
 ```
 
 ---
@@ -355,6 +439,21 @@ a run (no checkpoint that had returned was lost; the final digest matches an uni
 crash at every phase of a checkpoint, with torn and corrupted checkpoint data, and with a Chromium page reload
 that resumes from OPFS. SIGKILL tests process crashes only; power-loss durability relies on `fsync` and was not
 tested.
+
+Compressed tier (`compressBytes`, `runtime/compress.mjs`; optional, off by default, at least 16 KiB): like
+zswap/zram, evicted pages that compress to at most 5/8 of a page (WK-style word compressor, plain JS; its worst
+case is +6.4%, and such pages are never kept) stay in JS memory and fault back in without storage I/O. The tier
+allocates its whole budget up front as typed arrays, bookkeeping included, and never more. The oldest entries spill
+to storage when it is full (dirty ones written, clean ones dropped); prefetched pages that were never used do not
+enter it; flush and checkpoint write its dirty pages, so it works with `durableStore` (tested with a crash in every
+checkpoint phase); the write budget counts storage writes only. With the same page memory (pool 25% vs pool 12.5% +
+tier 12.5%) on SIMULATED slow storage (50 µs per read, 100 µs per page written: in-memory pages plus busy-waits, no
+real device), it cut time by 38% for a half-empty hash table and 18% for random updates of a counter array (their
+pages compress 3.3-4:1), and cost 1-3% for random sort keys and pixels, which do not compress. It costs 4-6 µs of
+CPU per page each way, so with no storage latency it is 4-8x slower, and on OPFS or the OS file cache (~2 µs per
+read when warm) it is a loss. In a sweep of SIMULATED latencies A and B are about even (within 5%) at ~10/20 µs per
+read/write for hash and ~20/40 µs for rand; below that the tier loses. Enable it only for slow storage and
+compressible data. See [results/COMPRESS.md](results/COMPRESS.md).
 
 Tested: Linux with Node 22 and Bun 1.3, and headless Chromium 141 (Worker + OPFS). Not yet tested: Safari, iOS,
 iPadOS, Android, Firefox, Windows, macOS. Browser floors (Chrome/Edge 108+, Firefox 114+, Safari 17+) are where

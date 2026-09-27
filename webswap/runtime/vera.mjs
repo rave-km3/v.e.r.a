@@ -11,6 +11,7 @@ import { Pager, VeraBudgetError } from './pager.mjs';
 import { MemoryBackend, PAGE } from './backends.mjs';
 import { meter } from './meter.mjs';
 import { DurableBackend } from './durable.mjs';
+import { CompressedTier } from './compress.mjs';
 
 export { VeraBudgetError };
 
@@ -75,13 +76,38 @@ export function timerResolutionUs() {
 //                 vera.checkpoint(extra) commits a crash-consistent snapshot.
 //   resume:       with durableStore, continue from the newest valid
 //                 checkpoint if there is one (vera.resumed tells which).
+//   compressBytes: size of a compressed page tier in JS memory, between the
+//                 pool and storage (default 0 = none; otherwise at least
+//                 16 KiB; see compress.mjs). Evicted pages that compress well
+//                 stay there and fault back in without storage I/O. The tier
+//                 allocates exactly this much (less a few bytes) up front and
+//                 never more. It pays off only when storage is slow (the codec
+//                 costs several us per page, more than a read from the OS file
+//                 cache) and the heap's pages compress; for random data it
+//                 costs a little CPU (such pages bypass it). With durableStore
+//                 it is as volatile as the frame pool: checkpoint() writes its
+//                 dirty pages before committing, and pages it spills between
+//                 checkpoints go to the uncommitted slots like any other.
 export async function createVera({
   wasm, poolBytes = 64 << 20, backend = new MemoryBackend(), imports = {},
   readahead = 16, writeBudgetBytes, writeBudgetBytesPerDay, budgetStore = null,
   onBudget = 'warn', onEvent = null,
-  curveMultipliers = [2, 4], durableStore = null, resume = false,
+  curveMultipliers = [2, 4], durableStore = null, resume = false, compressBytes = 0,
 }) {
   const budgetBytes = writeBudgetBytes ?? writeBudgetBytesPerDay ?? 2 ** 30;
+  // Sizes are refused before anything is compiled, instantiated or resumed
+  // (the caller's backend is untouched then). Only 'auto' and the pool's
+  // upper bound need the module's layout.
+  if (typeof compressBytes !== 'number' || !Number.isFinite(compressBytes) || compressBytes < 0) {
+    throw new TypeError(`vera: compressBytes must be a number of bytes, 0 for no compressed tier (got ${String(compressBytes)})`);
+  }
+  if (compressBytes > 0) CompressedTier.checkBytes(compressBytes);
+  const roundPool = (bytes) => {
+    const b = Math.floor(bytes / WASM_PAGE) * WASM_PAGE;
+    if (b < 16 * PAGE) throw new Error('vera: pool too small (need at least 64 KiB)');
+    return b;
+  };
+  if (poolBytes !== 'auto') poolBytes = roundPool(poolBytes);
   const module = wasm instanceof WebAssembly.Module ? wasm : await WebAssembly.compile(wasm);
   const layout = readLayout(module);
   const framesAddr = alignUp(Math.max(layout.heapBase, layout.minPages * WASM_PAGE), WASM_PAGE);
@@ -90,10 +116,8 @@ export async function createVera({
   if (poolBytes === 'auto') {
     // Half of the largest Memory this device lets us reserve, capped at 128 MiB.
     const got = probeMaxMemoryBytes(Math.min(maxPool, 256 << 20) + framesAddr);
-    poolBytes = Math.min(128 << 20, Math.floor((got - framesAddr) / 2));
+    poolBytes = roundPool(Math.min(128 << 20, Math.floor((got - framesAddr) / 2)));
   }
-  poolBytes = Math.floor(poolBytes / WASM_PAGE) * WASM_PAGE;
-  if (poolBytes < 16 * PAGE) throw new Error('vera: pool too small (need at least 64 KiB)');
   if (poolBytes > maxPool) throw new Error(`vera: pool too large for this build (max ${maxPool >> 20} MiB below VBASE)`);
 
   const pages = (framesAddr + poolBytes) / WASM_PAGE;
@@ -143,6 +167,7 @@ export async function createVera({
     memory, ptAddr, nvp: layout.nvp, framesAddr,
     poolFrames: poolBytes / PAGE, backend, readahead, writeBudgetBytes: budgetBytes, onBudget, onEvent,
     budgetState, saveBudget: budgetStore ? (s) => budgetStore.save(s) : null, curveMultipliers,
+    compressBytes,
   });
   if (resumed) for (const v of backend.writtenPages()) { pager.written[v] = 1; pager.seen[v] = 1; }
 
@@ -202,6 +227,9 @@ export async function createVera({
         timerResolutionUs: vera.timerResolutionUs,
         residentPages: pager.residentPages(), ...pager.stats, budgetUsedBytes: pager.budgetUsed,
         writeBudgetBytes: budgetBytes, budgetScope: pager.budgetScope,
+        compressBytes: pager.tier ? pager.tier.budget : 0,
+        tierMemoryBytes: pager.tier ? pager.tier.memoryBytes() : 0, // allocated, <= compressBytes
+        tierPages: pager.tier ? pager.tier.size : 0, tierUsedBytes: pager.tier ? pager.tier.used : 0,
       };
     },
     faultCurve() { return pager.curve.report(); },
@@ -219,6 +247,10 @@ export async function createVera({
       low.set(mem.subarray(ptEnd, layout.heapBase), ptAddr);
       return backend.checkpoint(low, extra);
     },
+    // Releases the backend (the default swap files are deleted). It writes
+    // no pages: what changed since the last flush() or checkpoint(), in the
+    // frame pool or in the compressed tier alike, is discarded, so with a
+    // backend that outlives it (keep: true) call flush() first.
     close() {
       pager.persistBudget();
       backend.close();

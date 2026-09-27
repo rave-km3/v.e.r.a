@@ -44,12 +44,13 @@
         </select></div>
       <div><label for="mb">Veri (MiB)</label><input id="mb" type="number" value="256" min="1" max="1800"></div>
       <div><label for="pool">Sayfa havuzu (MiB)</label><input id="pool" type="number" value="32" min="1" max="240"></div>
+      <div><label for="compress">Sıkıştırılmış katman (MiB, 0 = yok)</label><input id="compress" type="number" value="0" min="0" max="1024"></div>
       <div><label for="ops">İşlem sayısı (0 = varsayılan)</label><input id="ops" type="number" value="0" min="0"></div>
     </div>
     <button id="runVera">WebSwap ile çalıştır</button>
     <button id="runBase" class="secondary">Normal sürümü dene (sınırlı bellekle)</button>
     <button id="probe" class="secondary">Cihaz ölçümü</button>
-    <p class="note">"Normal sürüm", aynı programı sayfalama olmadan, belleği sayfa havuzu kadar sınırlanmış olarak çalıştırır: veri sığmazsa başarısız olur.</p>
+    <p class="note">"Normal sürüm", aynı programı sayfalama olmadan, belleği sayfa havuzu (ve sıkıştırılmış katman) kadar sınırlanmış olarak çalıştırır: veri sığmazsa başarısız olur.</p>
   </div>
 
   <div class="card"><pre id="out">Hazır.</pre></div>
@@ -65,7 +66,7 @@
   const $ = (id) => document.getElementById(id);
   const out = $('out');
   const MB = 2 ** 20;
-  const form = () => ({ app: $('app').value, mb: +$('mb').value, ops: +$('ops').value, seed: 1, pool: +$('pool').value * MB });
+  const form = () => ({ app: $('app').value, mb: +$('mb').value, ops: +$('ops').value, seed: 1, pool: +$('pool').value * MB, compress: +$('compress').value * MB });
   const busy = (on) => ['runVera', 'runBase', 'probe'].forEach((b) => ($(b).disabled = on));
 
   $('runVera').onclick = async () => {
@@ -83,7 +84,7 @@
   $('runBase').onclick = async () => {
     busy(true); out.textContent = 'Çalışıyor...';
     const f = form();
-    const r = await window.veraRun({ ...f, mode: 'baseline', cap: Math.max(f.pool, 16 * MB) });
+    const r = await window.veraRun({ ...f, mode: 'baseline', cap: Math.max(f.pool + f.compress, 16 * MB) });
     out.innerHTML = '';
     const head = document.createElement('div');
     head.className = r.ok ? 'ok' : 'bad';

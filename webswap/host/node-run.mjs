@@ -10,6 +10,10 @@
 //   --ops N           operation count for random apps (0 = app default)
 //   --seed N
 //   --pool SIZE       page pool (real memory for pages), e.g. 16M, 64M, auto
+//   --compress SIZE   compressed page tier in JS memory between the pool and
+//                     storage, e.g. 16M (default 0 = none; minimum 16K). Pays
+//                     off only on slow storage and compressible data: see
+//                     results/COMPRESS.md
 //   --backend KIND    mem | file | delay:READ_US:WRITE_US (SIMULATED latency on mem)
 //   --baseline        run the ordinary (non-paged) build instead
 //   --cap SIZE        baseline only: maximum Memory, to emulate a device limit
@@ -33,6 +37,7 @@ export function parseSize(s) {
 }
 
 export function makeBackend(spec) {
+  if (spec && typeof spec === 'object' && typeof spec.read === 'function') return spec; // a backend already
   if (spec === 'mem') return new MemoryBackend();
   if (spec === 'file') return new NodeFileBackend(fs, path.join(os.tmpdir(), `vera-heap-${process.pid}-${Date.now()}.bin`));
   const d = /^delay:(\d+):(\d+)$/.exec(spec);
@@ -49,7 +54,7 @@ export function appWasm(app) {
 }
 
 // One run; returns a plain result object.
-export async function runOnce({ app, mb, ops = 0, seed = 1, pool = 64 << 20, backend = 'mem', baseline = false, cap = null }) {
+export async function runOnce({ app, mb, ops = 0, seed = 1, pool = 64 << 20, backend = 'mem', baseline = false, cap = null, compress = 0 }) {
   const w = appWasm(app);
   const args = [mb, ops, seed];
   if (baseline) {
@@ -61,7 +66,16 @@ export async function runOnce({ app, mb, ops = 0, seed = 1, pool = 64 << 20, bac
     const status = error ? -1 : b.exports.status();
     return { app, mb, ops, seed, mode: 'baseline', cap, ms, value: value === null ? null : BigInt.asUintN(64, value).toString(16), status, error, memoryBytes: b.memory.buffer.byteLength };
   }
-  const v = await createVera({ wasm: w.vera, poolBytes: pool, backend: makeBackend(backend) });
+  const be = makeBackend(backend);
+  let v;
+  try {
+    v = await createVera({ wasm: w.vera, poolBytes: pool, backend: be, compressBytes: compress });
+  } catch (e) {
+    // Options createVera refused: close the backend (a 'file' one deletes
+    // its swap file), as v.close() would have.
+    try { be.close(); } catch { /* keep the original error */ }
+    throw e;
+  }
   const t0 = performance.now();
   let value = null, error = null;
   try { value = v.exports.run(...args); } catch (e) { error = e.message; }
@@ -74,7 +88,7 @@ export async function runOnce({ app, mb, ops = 0, seed = 1, pool = 64 << 20, bac
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const o = { app: 'sort', mb: 64, ops: 0, seed: 1, pool: 64 << 20, backend: 'mem', baseline: false, cap: null, lang: 'tr', json: false };
+  const o = { app: 'sort', mb: 64, ops: 0, seed: 1, pool: 64 << 20, compress: 0, backend: 'mem', baseline: false, cap: null, lang: 'tr', json: false };
   const a = process.argv.slice(2);
   for (let i = 0; i < a.length; i++) {
     const k = a[i];
@@ -83,6 +97,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     else if (k === '--ops') o.ops = +a[++i];
     else if (k === '--seed') o.seed = +a[++i];
     else if (k === '--pool') o.pool = parseSize(a[++i]);
+    else if (k === '--compress') o.compress = parseSize(a[++i]);
     else if (k === '--backend') o.backend = a[++i];
     else if (k === '--baseline') o.baseline = true;
     else if (k === '--cap') o.cap = parseSize(a[++i]);

@@ -62,11 +62,12 @@ try {
     { app: 'fuzz', mb: 16, ops: 200_000, seed: 1, pool: 1 * MB },
     { app: 'sort', mb: 64, ops: 0, seed: 1, pool: 16 * MB },
     { app: 'hash', mb: 32, ops: 200_000, seed: 1, pool: 8 * MB },
+    { app: 'fuzz', mb: 16, ops: 200_000, seed: 2, pool: 1 * MB, compress: 1 * MB }, // with a compressed tier
   ];
   for (const c of cases) {
     const ref = await runOnce({ ...c, baseline: true });
     const r = await page.evaluate((req) => window.veraRun(req), { ...c, mode: 'vera', backend: 'opfs' });
-    const row = { ...c, pool: c.pool / MB, ok: r.ok, ms: r.ms && +r.ms.toFixed(0), value: r.value, expected: ref.value,
+    const row = { ...c, pool: c.pool / MB, compress: (c.compress ?? 0) / MB, tierHits: r.stats?.tierHits, ok: r.ok, ms: r.ms && +r.ms.toFixed(0), value: r.value, expected: ref.value,
       backend: r.stats?.backend, readMiB: r.stats && +(r.stats.readBytes / MB).toFixed(1), writtenMiB: r.stats && +(r.stats.writeBytes / MB).toFixed(1),
       memoryMiB: r.stats && +(r.stats.memoryBytes / MB).toFixed(1), error: r.error };
     results.cases.push(row);
@@ -75,7 +76,8 @@ try {
       assert.equal(r.stats.backend, 'opfs');
       assert.equal(r.value, ref.value, 'same result as Node baseline');
       assert.ok(r.stats.readBytes > 0 && r.stats.writeBytes > 0, 'pages really went through OPFS');
-      console.log(`ok   ${c.app} ${c.mb} MiB, pool ${c.pool / MB} MiB, OPFS: ${row.ms} ms, read ${row.readMiB} MiB, wrote ${row.writtenMiB} MiB, checksum matches Node`);
+      if (c.compress) assert.ok(r.stats.tierHits > 0 && r.stats.compressBytes === c.compress, 'and through the compressed tier');
+      console.log(`ok   ${c.app} ${c.mb} MiB, pool ${c.pool / MB} MiB${c.compress ? ` + tier ${c.compress / MB} MiB (${r.stats.tierHits} tier hits)` : ''}, OPFS: ${row.ms} ms, read ${row.readMiB} MiB, wrote ${row.writtenMiB} MiB, checksum matches Node`);
     } catch (e) {
       failed++;
       console.log(`FAIL ${c.app}: ${e.message}`);

@@ -22,11 +22,11 @@ const swept = OPFSSyncBackend.sweep().catch(() => 0);
 // in this browser profile, not just one run.
 const budgetStore = new OPFSBudgetStore();
 
-async function runVera({ app, mb, ops, seed, pool, backend }) {
+async function runVera({ app, mb, ops, seed, pool, backend, compress = 0 }) {
   await swept;
   const store = backend === 'opfs' ? await OPFSSyncBackend.open() : new MemoryBackend();
   try {
-    const v = await createVera({ wasm: await wasmBytes(app, 'vera'), poolBytes: pool, backend: store, budgetStore });
+    const v = await createVera({ wasm: await wasmBytes(app, 'vera'), poolBytes: pool, backend: store, budgetStore, compressBytes: compress });
     const t0 = performance.now();
     let value = null, error = null;
     try { value = v.exports.run(mb, ops, seed); } catch (e) { error = String(e && e.message || e); }

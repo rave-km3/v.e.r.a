@@ -149,3 +149,39 @@ test('a function with very many accesses is optimized with out-of-line translati
   await checkSwitch(dir, 1000, [0, 1, 3, 5, 63, 64, 65, 999, 1000]);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+// Review finding: node-run made its swap file (makeBackend('file')) before
+// createVera validated the options, and nothing closed it when createVera
+// refused them, so every bad --compress or --pool left a file in the
+// temp directory. Also the options must be refused before anything is
+// compiled, instantiated or resumed.
+test('node-run: options createVera refuses leave no swap file behind', async () => {
+  const { runOnce } = await import('../host/node-run.mjs');
+  const mine = () => fs.readdirSync(os.tmpdir()).filter((f) => f.startsWith(`vera-heap-${process.pid}-`)).sort();
+  const before = mine();
+  for (const [opts, err] of [
+    [{ compress: 1024 }, /compressBytes must be 0 \(no compressed tier\) or at least 16 KiB/],
+    [{ compress: 16383 }, /compressBytes/],
+    [{ compress: -1 }, /compressBytes/],
+    [{ pool: 1024 }, /pool too small/],
+    [{ pool: 2 ** 32 }, /pool too large/], // only known once the module's layout is read
+  ]) {
+    await assert.rejects(runOnce({ app: 'rand', mb: 1, pool: 1 << 20, backend: 'file', ...opts }), err, JSON.stringify(opts));
+    assert.deepEqual(mine(), before, `no swap file left by ${JSON.stringify(opts)}`);
+  }
+});
+
+test('createVera refuses a bad compressBytes or pool size before compiling anything', async () => {
+  const notWasm = new Uint8Array([1, 2, 3]); // compiling this would fail with a CompileError
+  for (const compressBytes of [1, 1024, (16 << 10) - 1]) {
+    await assert.rejects(createVera({ wasm: notWasm, poolBytes: 1 << 20, compressBytes }),
+      (e) => e instanceof RangeError && /at least 16 KiB/.test(e.message), String(compressBytes));
+  }
+  for (const compressBytes of [-1, Infinity, NaN, '16M']) {
+    await assert.rejects(createVera({ wasm: notWasm, poolBytes: 1 << 20, compressBytes }), TypeError, String(compressBytes));
+  }
+  for (const poolBytes of [0, 1024, 65535]) {
+    await assert.rejects(createVera({ wasm: notWasm, poolBytes }), /pool too small/, String(poolBytes));
+  }
+  await assert.rejects(createVera({ wasm: notWasm, poolBytes: 1 << 20, compressBytes: 16 << 10 }), WebAssembly.CompileError, 'valid sizes get as far as compiling');
+});

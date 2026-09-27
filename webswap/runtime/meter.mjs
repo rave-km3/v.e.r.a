@@ -19,6 +19,10 @@ function histPercentile(hist, q) {
 export function meter(s, curve, lang = 'tr', { wallMs = null, baselineMs = null } = {}) {
   const tr = lang === 'tr';
   const f1 = fmt(lang);
+  // Compression ratio of the codec, and of the tier's blocks (entry header
+  // and rounding to 128 bytes included): the second is what fits.
+  const ratio = (st) => (st.tierOutBytes ? f1(st.tierInBytes / st.tierOutBytes) : '—');
+  const blockRatio = (st) => (st.tierBlockBytes ? f1(st.tierInBytes / st.tierBlockBytes) : '—');
   const lines = [];
   const pool = s.poolBytes / MB;
   const mem = s.memoryBytes / MB;
@@ -38,6 +42,9 @@ export function meter(s, curve, lang = 'tr', { wallMs = null, baselineMs = null 
     lines.push(`Sayfa hataları: ${s.majorRead} diskten okuma, ${s.zeroFill} boş (sıfır) sayfa, ${s.minor} ucuz yeniden eşleme (G/Ç yok).`);
     const bt = daily ? 'son 24 saatin yazma bütçesi' : 'bu çalıştırmanın yazma bütçesi';
     lines.push(`Diskten okunan: ${f1(readMB)} MiB (${s.readaheadPages} sayfa önden okundu). Diske yazılan: ${f1(writeMB)} MiB (${bt}: %${f1(budgetPct)}${over ? ', bütçe aşıldı' : ''}).`);
+    if (s.compressBytes) {
+      lines.push(`Sıkıştırılmış katman: ${f1(s.compressBytes / MB)} MiB JS belleği (wasm belleğine ek), şu an ${s.tierPages} sayfa. ${s.tierHits} sayfa hatası diske gitmeden buradan karşılandı; ${s.tierStores} sayfa girdi (sıkıştırma ${ratio(s)}:1, blok payıyla ${blockRatio(s)}:1), ${s.tierRejects} sayfa yeterince sıkışmadığı için katmanı atladı. Katmandan diske ${s.tierSpills + s.tierFlushes} sayfa yazıldı, ${s.tierDrops} temiz sayfa yazılmadan atıldı (diske yazılanlar yukarıdaki toplamın içinde).`);
+    }
     if (p50 !== null) lines.push(`Diske giden bir sayfa hatası: ortanca ≤${p50} µs, en yavaş %1 hariç ≤${p99} µs (RAM erişimi ~0,1 µs).`);
     if (coarse) lines.push(`(Bu ortamın zamanlayıcısı kaba, ~${f1(s.timerResolutionUs)} µs: tek tek sayfa hatası süreleri ölçülemedi.)`);
     if (wallMs !== null && !coarse) lines.push(`Toplam süre: ${f1(wallMs)} ms. Sayfa hatalarında geçen pay: ~%${f1((100 * s.faultTimeMs) / wallMs)}.`);
@@ -54,6 +61,9 @@ export function meter(s, curve, lang = 'tr', { wallMs = null, baselineMs = null 
     lines.push(`Page faults: ${s.majorRead} read from storage, ${s.zeroFill} zero pages, ${s.minor} cheap remaps (no I/O).`);
     const bt = daily ? 'the last 24 hours\' write budget' : 'this run\'s write budget';
     lines.push(`Read: ${f1(readMB)} MiB (${s.readaheadPages} pages read ahead). Written: ${f1(writeMB)} MiB, ${f1(budgetPct)}% of ${bt}${over ? ' (over budget)' : ''}.`);
+    if (s.compressBytes) {
+      lines.push(`Compressed tier: ${f1(s.compressBytes / MB)} MiB of JS memory (besides the wasm memory), ${s.tierPages} pages in it now. ${s.tierHits} faults were served from it without storage I/O; ${s.tierStores} pages went in (compressed ${ratio(s)}:1, ${blockRatio(s)}:1 in its blocks), ${s.tierRejects} did not compress enough and bypassed it. ${s.tierSpills + s.tierFlushes} of its pages were written to storage (counted in Written above), ${s.tierDrops} clean ones dropped without a write.`);
+    }
     if (p50 !== null) lines.push(`A fault that went to storage: median ≤${p50} µs, p99 ≤${p99} µs (a RAM access is ~0.1 µs).`);
     if (coarse) lines.push(`(This environment's timer is coarse, ~${f1(s.timerResolutionUs)} µs: per-fault times could not be measured.)`);
     if (wallMs !== null && !coarse) lines.push(`Total ${f1(wallMs)} ms; ~${f1((100 * s.faultTimeMs) / wallMs)}% of it was spent in page faults.`);
