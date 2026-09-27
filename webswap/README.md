@@ -23,24 +23,24 @@ $ node host/node-run.mjs --app sort --mb 256 --baseline --cap 128M
 sort 256 MiB, ordinary build, Memory capped at 128 MiB: FAILED (out of memory: malloc returned NULL)
 
 $ node host/node-run.mjs --app sort --mb 256 --baseline
-sort 256 MiB, ordinary build: ok in 2732 ms, checksum 85bbd074979d1db4, Memory 513 MiB
+sort 256 MiB, ordinary build: ok in 2640 ms, checksum 85bbd074979d1db4, Memory 513 MiB
 
 $ node host/node-run.mjs --app sort --mb 256 --pool 32M --backend file
 vera: this run's storage write budget exceeded (1024 MiB > 1024 MiB)
-sort 256 MiB, WebSwap build: ok in 7173 ms, checksum 85bbd074979d1db4
+sort 256 MiB, WebSwap build: ok in 5834 ms, checksum 85bbd074979d1db4
 Depolama: file. Sayfa havuzu: 32 MiB (gerçek wasm belleği: 36,8 MiB).
 (Dosya depolaması: işletim sisteminin dosya önbelleği okumaları hızlandırmış olabilir; soğuk disk daha yavaştır.)
 Sayfa hataları: 270369 diskten okuma, 131074 boş (sıfır) sayfa, 519685 ucuz yeniden eşleme (G/Ç yok).
 Diskten okunan: 3.072 MiB (516061 sayfa önden okundu). Diske yazılan: 1.284 MiB (bu çalıştırmanın yazma bütçesi: %125,4, bütçe aşıldı).
 Diske giden bir sayfa hatası: ortanca ≤8 µs, en yavaş %1 hariç ≤128 µs (RAM erişimi ~0,1 µs).
-Toplam süre: 7.173,5 ms. Sayfa hatalarında geçen pay: ~%38,4.
+Toplam süre: 5.833,8 ms. Sayfa hatalarında geçen pay: ~%49,6.
 Tahmin (yaklaşık): diskten sayfa okuma sayısı şu an 270369; 2 kat havuzla ~270199, 4 kat havuzla ~269387.
 Not: Bu araç RAM eklemez, hiçbir şeyi hızlandırmaz. Belleğe sığmayan işin çökmeden, daha yavaş da olsa bitmesini sağlar.
 ```
 
 Belleği 128 MiB ile sınırlanan normal sürüm çöküyor. WebSwap sürümü 36,8 MiB wasm belleğiyle işi bitiriyor
 ve sınırsız belleğe sahip normal sürümle **aynı 64 bit sağlama toplamını** üretiyor. Bu makinede sınırsız normal
-sürüm 2,7 saniye, WebSwap 7,2 saniye sürdü: yaklaşık 2,6 kat yavaş. Takas dosyası bu makinenin
+sürüm 2,6 saniye, WebSwap 5,8 saniye sürdü: yaklaşık 2,2 kat yavaş. Takas dosyası bu makinenin
 bol RAM'i sayesinde işletim sisteminin dosya önbelleğinde kaldı; gerçekten diske giden okumalarda fark daha büyük olur.
 
 ---
@@ -105,12 +105,12 @@ disk). Her hücre tek ölçüm; aynı makinede tekrarlarda %10-30 oynama bekleni
 
 | İş (erişim deseni) | İstenen bellek | wasm belleği | Normal sürüm, bellek yarıya sınırlı | WebSwap, bellek içi depolama¹ | WebSwap, dosya² | Yavaş depolamada (50/100 µs)³ | Diske yazılan |
 |---|---:|---:|---|---:|---:|---:|---:|
-| **sort 1 GiB anahtar** (sıralı) | 2 GiB | 69 MiB | çöktü (256 MiB sınırı) | — | **2,0x** | — | 5,0 GiB |
-| sort (sıralı) | 128 MiB | 37 MiB | çöktü | 1,9x | 2,3x | 18,7x (ölçüldü) | 324 MiB |
-| blur (2B yerellik) | 128 MiB | 37 MiB | çöktü | 1,6x | 1,6x | 10,7x (ölçüldü) | 128 MiB |
-| rand (rastgele güncelleme) | 128 MiB | 37 MiB | çöktü | 5,9x | 6,8x | ~178x (tahmini) | 714 MiB |
-| hash (rastgele + sıcak bölge) | 128 MiB | 37 MiB | çöktü | 50,4x | 61,6x | ~1.600x (tahmini) | 12,1 GiB |
-| chase (bağımlı rastgele) | 128 MiB | 37 MiB | çöktü | 57,2x | 72,4x | ~2.000x (tahmini) | 51,9 GiB |
+| **sort 1 GiB anahtar** (sıralı) | 2 GiB | 69 MiB | çöktü (256 MiB sınırı) | — | **2,1x** | — | 5,0 GiB |
+| sort (sıralı) | 128 MiB | 37 MiB | çöktü | 1,7x | 1,8x | 20,5x (ölçüldü) | 324 MiB |
+| blur (2B yerellik) | 128 MiB | 37 MiB | çöktü | 1,3x | 1,5x | 10,3x (ölçüldü) | 128 MiB |
+| rand (rastgele güncelleme) | 128 MiB | 37 MiB | çöktü | 5,2x | 6,3x | ~165x (tahmini) | 714 MiB |
+| hash (rastgele + sıcak bölge) | 128 MiB | 37 MiB | çöktü | 44,9x | 53,5x | ~1.500x (tahmini) | 12,1 GiB |
+| chase (bağımlı rastgele) | 128 MiB | 37 MiB | çöktü | 69,8x | 89,8x | ~2.600x (tahmini) | 51,9 GiB |
 
 1. **Bellek içi depolama:** Sayfalar JavaScript belleğinde tutulur. Yalnızca sayfalama politikasının ve adres
    çevirisinin maliyetini ölçer; gerçek bir cihazda bu depolama anlamsızdır.
@@ -119,20 +119,47 @@ disk). Her hücre tek ölçüm; aynı makinede tekrarlarda %10-30 oynama bekleni
    ya da RAM'i az bir telefonda daha yavaş olur.
 3. **Yavaş depolama:** Her okumaya 50 µs, her yazmaya 100 µs eklenir. sort ve blur için bu gecikmeyle gerçekten
    ölçüldü; diğerleri için bellek içi süre + (okuma × 50 µs + yazma × 100 µs) olarak tahmin edildi. Bu tahmin
-   modeli, ölçülen iki durumda %3-4 sapmayla tuttu.
+   modeli, ölçülen iki durumda %4 sapmayla tuttu.
 
 - Bütün WebSwap çalıştırmalarında sonuç, sınırsız belleğe sahip normal sürümle **aynı** (64 bit sağlama toplamı).
 - "wasm belleği", programın gerçek `WebAssembly.Memory` boyutudur. Buna ek olarak sayfalayıcı, JavaScript tarafında
   havuz boyutundan bağımsız yaklaşık 13 MiB'lık sabit bir tablo tutar (dayanıklı kipte ~2 MiB daha).
-- Her şey havuza sığdığında bile adres çevirisinin maliyeti: **1,3-2,6 kat** (rand 1,3x, hash 1,7x, blur 1,8x, sort 1,9x, chase 2,6x).
+- Her şey havuza sığdığında bile adres çevirisinin maliyeti, tablodaki gibi tek bir çalıştırmada **1,1-2,6 kat**
+  (rand 1,1x, blur 1,2x, sort 1,4x, hash 1,5x, chase 2,6x). Aynı program tekrar çalıştırılınca, JIT'in
+  optimize ettiği kodla **1,1-1,3 kat** (aşağıda).
 - chase ve hash'te maliyetin çoğu, hazırlık aşamasındaki rastgele yazmalardan geliyor. 128 MiB'lık bir dizi için
   diske 51,9 GiB yazılması, rastgele yazmanın flaş belleği nasıl yıpratabileceğini gösteriyor. Sayaç ve yazma
   bütçesi bu yüzden var.
 
-**Özet:** Sıralı erişen işlerde (sıralama, görüntü işleme) bedel, takas dosyası önbellekteyken ~1,6-2,3 kat, yavaş
+**Özet:** Sıralı erişen işlerde (sıralama, görüntü işleme) bedel, takas dosyası önbellekteyken ~1,3-2,1 kat, yavaş
 depolamada ~10-20 kat. Rastgele erişen işlerde (hash tablosu, rastgele güncelleme, işaretçi takibi) havuz
 küçüldükçe bedel onlarca, yavaş depolamada yüzlerce hatta binlerce kata çıkıyor. Diske yazılan veri de
 gigabaytlara ulaşabiliyor. WebSwap bunu gizlemiyor, sayacında gösteriyor.
+
+### Hızlandırma: önce ve sonra
+
+Adres çevirisini ucuzlatan dört değişiklik ([Nasıl çalışır?](#nasıl-çalışır)) öncesi ve sonrası, her şey havuza
+sığarken (yalnızca çevirinin maliyeti), normal sürüme göre. `bench/overhead.mjs`, 2 tur × 5 tekrarın en hızlısı,
+aynı makinede sırayla:
+
+| İş | Önce | Sonra | Değişim (süre) |
+|---|---:|---:|---:|
+| sort | 1,39x | 1,01x | −%26 |
+| blur | 1,32x | 1,10x | −%16 |
+| hash | 1,27x | 1,14x | −%1 |
+| rand | 1,24x | 1,10x | −%14 |
+| chase | 2,00x | 1,55x | −%24 |
+| **Geometrik ortalama** | **1,42x** | **1,17x** | |
+
+- Bu sayılar, V8'in optimize eden derleyicisinin (TurboFan) kodunu ölçer: modül tekrar derlendiğinde V8 önceki
+  sonucu yeniden kullanır. Tek ve uzun bir çalıştırma çoğunlukla V8'in hızlı ilk derleyicisinin (Liftoff) koduyla
+  biter; yalnızca Liftoff ile ölçünce ortalama **1,79x → 1,35x**. Yukarıdaki büyük tablo bu "tek çalıştırma"
+  durumudur.
+- Havuz yığının %25'i olduğunda (sayfalama da işin içinde): ortalama 2,43x → 2,20x. Bu durumda zamanın çoğu artık
+  çeviride değil, sayfa hatalarında.
+- Denenip bırakılanlar: sayfa tablosunu ikiye katlamak ya da bütün 4 GiB'ı kapsayacak kadar büyütmek (bellek
+  maliyeti), sayfa sınırı denetimini kaldırmak (tanımsız davranış içeren C kodunda veriyi sessizce bozabilirdi),
+  girdileri fark olarak saklamak (ölçülebilir kazanç yok).
 
 ### Doğruluk
 
@@ -375,8 +402,8 @@ iPad'lerde iPadOS 16'dan beri sistem swap'ı var. Bunun doğrulanması, gerçek 
 
 ## Sınırlamalar
 
-- **Yavaşlık:** Her bellek erişimine adres çevirisi eklendiği için, her şey havuza sığsa bile ölçümlerde
-  1,3-2,6 kat yavaşlama oldu. Havuza sığmayan rastgele erişimde yavaşlama çok daha büyüktür (yukarıdaki tablo).
+- **Yavaşlık:** Her bellek erişimine adres çevirisi eklendiği için, her şey havuza sığsa bile ölçümlerde tek
+  çalıştırmada 1,1-2,6 kat, tekrar eden çalıştırmalarda 1,1-1,3 kat yavaşlama oldu. Havuza sığmayan rastgele erişimde yavaşlama çok daha büyüktür (yukarıdaki tablo).
 - **Yeniden derleme şart:** Hazır `.wasm` dosyaları çalışmaz; program WebSwap ile kaynak koddan derlenir.
   Şimdilik yalnızca freestanding C ve `vera.h` içindeki küçük libc. Rust, Zig ve Emscripten uyarlamaları yapılmadı.
 - **Desteklenmeyenler:** Toplu bellek komutları (bulk memory), SIMD, iş parçacıkları/atomikler, `memory.grow`,
@@ -420,6 +447,7 @@ host/node-run.mjs        komut satırı
 host/web/                tarayıcı sayfası + Worker + küçük sunucu
 test/                    132 test + tarayıcı + çalışma ortamı testleri
 bench/run-all.mjs        ölçüm matrisi → results/BENCH.md
+bench/overhead.mjs       çevirinin maliyeti (tekrarlı, en hızlı süreler)
 bench/compress.mjs       sıkıştırılmış katman, aynı bellekle → results/COMPRESS.md
 ```
 
@@ -436,8 +464,12 @@ bounds-checked. Across all tests the paged build returns the same 64-bit checksu
 runtime uses CLOCK with sampled reference bits, dirty tracking, zero-page elision, sequential readahead, a
 flash-write budget over a 24-hour window (per run, or across runs with a budget store), and a bilingual meter.
 
-It is **not** faster and adds no RAM. It turns "out of memory, tab crashed" into "finished, slower", and it
-measures and reports the cost: in our runs ~1.6-2.3x for sequential work while the swap file stayed in the OS
+Translation cost with everything resident (bench/overhead.mjs) went from 1.42x to 1.17x (geomean, V8's
+optimizing tier; 1.79x to 1.35x in its baseline tier, which a single long run mostly uses) after four changes: a
+single cold branch per access with a noreturn trap, a biased page-table index, one translation for accesses that
+share a base pointer, and a loop-scoped software TLB in wasm locals, all kept only after interleaved measurements
+and an adversarial review. It is **not** faster than running without WebSwap and adds no RAM. It turns "out of memory, tab crashed" into "finished, slower", and it
+measures and reports the cost: in our runs ~1.3-2.1x for sequential work while the swap file stayed in the OS
 cache, ~10-20x with simulated slow storage, and tens to thousands of times for random access. As far as we
 could find (September 2026), no general drop-in demand-paging layer for WebAssembly linear memory in browsers
 exists. The mechanism itself is well known: software page tables with flash paging (ViMem 2007, t-kernel 2006),
