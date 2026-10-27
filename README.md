@@ -1,4 +1,4 @@
-#HALEN HALKA AÇIK DEĞİLDİR:
+# HALEN HALKA AÇIK DEĞİLDİR.
 
 # V.E.R.A.
 
